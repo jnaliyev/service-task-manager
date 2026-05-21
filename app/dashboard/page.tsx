@@ -7,6 +7,7 @@ type Employee = {
   id: string;
   full_name: string;
   role: string;
+  department?: string;
   is_active: boolean;
 };
 
@@ -17,6 +18,9 @@ type Task = {
  technician: string;
   status: string;
   category?: string;
+  department?: string;
+assigned_to?: string;
+created_by?: string;
   priority?: string;
   due_date?: string;
   employee_id?: string;
@@ -58,6 +62,20 @@ const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const isAdmin = currentEmployee?.role === "Admin";
+const isManager = currentEmployee?.role === "Manager";
+const isTechnician = currentEmployee?.role === "Technician";
+const isInventory = currentEmployee?.role === "Inventory";
+const isViewer = currentEmployee?.role === "Viewer";
+
+const canEdit =
+  isAdmin || isManager || isTechnician || isInventory;
+
+const canCreateTask =
+  isAdmin || isManager;
+
+const canManageEmployees =
+  isAdmin;
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
   const [employeeFilter, setEmployeeFilter] = useState("All");
@@ -669,12 +687,9 @@ location: selectedStore?.location || "",
               style={inputStyle}
             >
               <option>General</option>
-              <option>CCTV</option>
-              <option>EAS</option>
-              <option>Construction</option>
-              <option>Furniture</option>
-              <option>Electrical</option>
-              <option>HVAC</option>
+<option>Construction</option>
+<option>Systems</option>
+<option>Inventory</option>
             </select>
 
             <select
@@ -696,9 +711,14 @@ location: selectedStore?.location || "",
             />
           </div>
 
-          <button onClick={addTask} style={{ ...buttonStyle, marginTop: "20px" }}>
-            Save Task
-          </button>
+          {canCreateTask && (
+  <button
+    onClick={addTask}
+    style={{ ...buttonStyle, marginTop: "20px" }}
+  >
+    Save Task
+  </button>
+)}
         </div>
       )}
 
@@ -911,21 +931,27 @@ location: selectedStore?.location || "",
       {task.employees?.full_name || task.technician || "Not assigned"}
     </td>
     <td style={tdStyle}>
-      <select
-        value={task.status}
-        onChange={(e) => updateStatus(task.id, e.target.value)}
-        style={{
-          padding: "8px",
-          borderRadius: "8px",
-          border: "1px solid #ccc",
-          color: getStatusColor(task.status),
-        }}
-      >
-        <option>Open</option>
-        <option>In Progress</option>
-        <option>Waiting Parts</option>
-        <option>Completed</option>
-      </select>
+    {canEdit ? (
+  <select
+    value={task.status}
+    onChange={(e) => updateStatus(task.id, e.target.value)}
+    style={{
+      padding: "8px",
+      borderRadius: "8px",
+      border: "1px solid #ccc",
+      color: getStatusColor(task.status),
+    }}
+  >
+    <option>Open</option>
+    <option>In Progress</option>
+    <option>Waiting Parts</option>
+    <option>Completed</option>
+  </select>
+) : (
+  <span style={{ color: getStatusColor(task.status), fontWeight: "bold" }}>
+    {task.status}
+  </span>
+)}
     </td>
     <td style={tdStyle}>
   {task.created_at
