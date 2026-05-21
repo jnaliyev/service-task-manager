@@ -814,14 +814,11 @@ location: selectedStore?.location || "",
   onChange={(e) => setCategoryFilter(e.target.value)}
   style={inputStyle}
 >
-  <option>All</option>
-  <option>General</option>
-  <option>CCTV</option>
-  <option>EAS</option>
-  <option>Construction</option>
-  <option>Furniture</option>
-  <option>Electrical</option>
-  <option>HVAC</option>
+<option>All</option>
+<option>General</option>
+<option>Systems</option>
+<option>Construction</option>
+<option>Inventory</option>
 </select>
 <select
   value={companyFilter}
