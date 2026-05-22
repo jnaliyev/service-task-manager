@@ -635,9 +635,9 @@ color: textColor,
 <div
   style={{
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-    gap: "20px",
-    marginBottom: "30px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+    gap: "10px",
+    marginTop: "10px",
   }}
 >
         <div style={cardStyle}>
