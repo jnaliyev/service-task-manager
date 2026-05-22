@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import TaskMobileCard from "../components/TaskMobileCard";
 import TaskTable from "../components/TaskTable";
+import TaskForm from "../components/TaskForm";
 
 type Employee = {
   id: string;
@@ -711,7 +712,8 @@ return (
 )}
 
       {showForm && (
-        <div style={{ ...panelStyle, marginTop: "20px" }}>
+     <TaskForm>
+<div style={{ ...panelStyle, marginTop: "20px" }}>
           <h2>Add New Service Task</h2>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "15px", marginTop: "20px" }}>
@@ -830,6 +832,7 @@ location: selectedStore?.location || "",
   </button>
 )}
         </div>
+        </TaskForm>
       )}
 
       <div style={{ ...panelStyle, marginTop: "30px" }}>
@@ -1176,6 +1179,8 @@ Status: ${task.status}`
     borderRadius: "8px",
     cursor: "pointer",
     marginRight: "10px",
+    display: "inline-block",
+whiteSpace: "nowrap",
   }}
 >
   Upload Photo
