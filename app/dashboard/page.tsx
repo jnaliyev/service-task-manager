@@ -1332,8 +1332,9 @@ const panelStyle = {
 };
 
 const numberStyle = {
-  fontSize: "40px",
+  fontSize: "24px",
   fontWeight: "bold",
+  margin: "8px 0",
 };
 
 const thStyle = {
