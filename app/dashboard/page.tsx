@@ -1319,9 +1319,10 @@ whiteSpace: "nowrap",
 
 const cardStyle = {
   background: "white",
-  padding: "25px",
-  borderRadius: "16px",
+  padding: "16px",
+  borderRadius: "12px",
   boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+  minWidth: "160px",
 };
 
 const panelStyle = {
