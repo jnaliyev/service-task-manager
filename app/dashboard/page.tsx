@@ -1040,7 +1040,6 @@ location: selectedStore?.location || "",
         width: "100%",
         marginTop: "20px",
         borderCollapse: "collapse",
-        minWidth: "1100px",
         background: darkMode ? "#111827" : "white",
         color: darkMode ? "#f8fafc" : "#111827",
       }}
