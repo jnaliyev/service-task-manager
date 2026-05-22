@@ -1265,7 +1265,8 @@ whiteSpace: "nowrap",
 
     <div
       style={{
-        background: "white",
+        background: darkMode ? "#1f2937" : "white",
+color: darkMode ? "#f9fafb" : "#111827",
         padding: "30px",
         borderRadius: "16px",
         marginTop: "30px",
