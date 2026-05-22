@@ -13,6 +13,7 @@ type Employee = {
 
 type Task = {
   id: number;
+  store_id?: number | null;
   store: string;
   issue: string;
  technician: string;
@@ -59,6 +60,7 @@ export default function Dashboard() {
 const [commentText, setCommentText] = useState("");
 const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
@@ -1117,6 +1119,40 @@ Status: ${task.status}`
         }}
       >
         Comments
+        </button>
+        {(isAdmin || isManager) && (
+  <button
+    onClick={() => {
+      setEditingTask(task);
+
+      setShowForm(true);
+
+      setNewTask({
+        store_id: task.store_id ? String(task.store_id) : "",
+        store: task.store || "",
+        issue: task.issue || "",
+        employee_id: task.employee_id || "",
+        status: task.status || "Open",
+        category: task.category || task.department || "General",
+        priority: task.priority || "Medium",
+        due_date: task.due_date || "",
+        company_name: task.stores?.company_name || "",
+        location: task.stores?.location || "",
+      });
+    }}
+    style={{
+      background: "#7c3aed",
+      color: "white",
+      padding: "8px 14px",
+      border: "none",
+      borderRadius: "8px",
+      cursor: "pointer",
+      marginRight: "10px",
+    }}
+  >
+    Edit
+  </button>
+)}
         <a
   href={`https://wa.me/?text=${encodeURIComponent(
     `Task: ${task.issue}
@@ -1136,7 +1172,7 @@ Status: ${task.status}`
 >
   WhatsApp
 </a>
-      </button>
+
       <label
   style={{
     background: "#16a34a",
