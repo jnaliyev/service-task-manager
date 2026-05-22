@@ -235,8 +235,13 @@ location: "",
       .select("*, employees(full_name, role)")
       .order("created_at", { ascending: false });
   
-    if (employee?.role?.toLowerCase() === "technician") {
-      query = query.eq("employee_id", employee.id);
+    const role = employee?.role?.toLowerCase();
+    const department = employee?.department?.toLowerCase();
+  
+    if (role === "technician") {
+      query = query.eq("employee_id", employee?.id);
+    } else if (role === "manager" && department !== "general") {
+      query = query.eq("department", employee?.department);
     }
   
     const { data, error } = await query;
