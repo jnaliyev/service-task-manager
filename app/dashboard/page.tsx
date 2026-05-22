@@ -1323,7 +1323,15 @@ color: darkMode ? "#f9fafb" : "#111827",
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+      <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px",
+    marginTop: "20px",
+    alignItems: "center",
+  }}
+>
         <input
           placeholder="Write comment..."
           value={commentText}
