@@ -693,7 +693,13 @@ return (
       <div style={{ marginTop: "30px" }}>
   <h2>Department Overview</h2>
 
-  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "15px" }}>
+  <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+    gap: "15px",
+  }}
+>  
     {["General", "Construction", "Systems", "Inventory"].map((department) => (
       <div key={department} style={cardStyle}>
         <h3>{department}</h3>
