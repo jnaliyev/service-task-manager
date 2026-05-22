@@ -1104,6 +1104,7 @@ location: selectedStore?.location || "",
 >
   {task.status}
 </span>
+)}
 
     </td>
     <td style={tdStyle}>
