@@ -256,23 +256,29 @@ location: "",
     }
 
     const selectedEmployee = employees.find((e) => e.id === newTask.employee_id);
+    const taskPayload = {
+      store: newTask.store,
+      company_name: newTask.company_name || "",
+      location: newTask.location || "",
+      store_id: newTask.store_id ? Number(newTask.store_id) : null,
+      issue: newTask.issue,
+      status: newTask.status,
+      category: newTask.category,
+      department: newTask.category,
+      priority: newTask.priority,
+      due_date: newTask.due_date || null,
+      employee_id: newTask.employee_id || null,
+      technician: selectedEmployee?.full_name || "",
+    };
 
-    const { error } = await supabase.from("tasks").insert([
-      {
-        store: newTask.store,
-        company_name: newTask.company_name || "",
-location: newTask.location || "",
-        store_id: newTask.store_id ? Number(newTask.store_id) : null,
-        issue: newTask.issue,
-        status: newTask.status,
-        category: newTask.category,
-        department: newTask.category,
-        priority: newTask.priority,
-        due_date: newTask.due_date || null,
-        employee_id: newTask.employee_id || null,
-        technician: selectedEmployee?.full_name || "",
-      },
-    ]);
+    const { error } = editingTask
+    ? await supabase
+        .from("tasks")
+        .update(taskPayload)
+        .eq("id", editingTask.id)
+    : await supabase
+        .from("tasks")
+        .insert([taskPayload]);
 
     if (error) {
       console.error(error);
