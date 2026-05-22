@@ -721,7 +721,14 @@ return (
 
       {showForm && (
      <TaskForm>
-<div style={{ ...panelStyle, marginTop: "20px" }}>
+<div
+  style={{
+    ...panelStyle,
+    marginTop: "20px",
+    background: darkMode ? "#1f2937" : "white",
+    color: darkMode ? "#f9fafb" : "#111827",
+  }}
+>
           <h2>Add New Service Task</h2>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "15px", marginTop: "20px" }}>
