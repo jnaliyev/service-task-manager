@@ -85,6 +85,11 @@ const canManageEmployees =
   isAdmin;
   const [showForm, setShowForm] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const bgColor = darkMode ? "#020817" : "#f3f4f6";
+const panelBg = darkMode ? "#1e293b" : "white";
+const textColor = darkMode ? "#f8fafc" : "#111827";
+const inputBg = darkMode ? "#334155" : "white";
+const borderColor = darkMode ? "#475569" : "#d1d5db";
   const [statusFilter, setStatusFilter] = useState("All");
   const [employeeFilter, setEmployeeFilter] = useState("All");
 
@@ -534,8 +539,8 @@ return (
   style={{
     padding: "40px",
     fontFamily: "Arial",
-    background: darkMode ? "#0f172a" : "#f5f7fb",
-    color: darkMode ? "white" : "black",
+    background: bgColor,
+color: textColor,
     minHeight: "100vh",
     transition: "0.3s",
   }}
@@ -616,11 +621,11 @@ return (
 {currentEmployee && (
   <div
     style={{
-      background: "white",
+      background: panelBg,
       padding: "12px 18px",
       borderRadius: "10px",
       marginBottom: "20px",
-      color: "#374151",
+      color: textColor,
     }}
   >
     Logged in as: {currentEmployee.full_name} / Role: {currentEmployee.role}
@@ -725,8 +730,8 @@ return (
   style={{
     ...panelStyle,
     marginTop: "20px",
-    background: darkMode ? "#1f2937" : "white",
-    color: darkMode ? "#f9fafb" : "#111827",
+    background: panelBg,
+color: textColor,
   }}
 >
           <h2>Add New Service Task</h2>
@@ -895,7 +900,8 @@ location: selectedStore?.location || "",
       <div
         key={technician}
         style={{
-          background: "#ecfeff",
+          background: darkMode ? "#334155" : "#ecfeff",
+          color: darkMode ? "#f8fafc" : "#111827",
           padding: "10px 14px",
           borderRadius: "10px",
           fontSize: "14px",
@@ -1028,14 +1034,17 @@ location: selectedStore?.location || "",
   </div>
 
   {!isMobile && (
-    <TaskTable>
-  <table
-    style={{
-      width: "100%",
-      marginTop: "20px",
-      borderCollapse: "collapse",
-      minWidth: "1100px",
-    }}
+  <TaskTable>
+    <table
+      style={{
+        width: "100%",
+        marginTop: "20px",
+        borderCollapse: "collapse",
+        minWidth: "1100px",
+        background: darkMode ? "#111827" : "white",
+        color: darkMode ? "#f8fafc" : "#111827",
+      }}
+    >
   >
           <thead>
             <tr>
@@ -1056,21 +1065,31 @@ location: selectedStore?.location || "",
   <tr
   key={task.id}
   style={{
-    background:
-      task.status === "Completed"
-        ? "#ecfdf5"
-        : task.priority === "Urgent"
-        ? "#fee2e2"
-        : task.priority === "High"
-        ? "#fff7ed"
-        : "white",
+    background: darkMode
+      ? "#1e293b"
+      : task.status === "Completed"
+      ? "#ecfdf5"
+      : task.priority === "Urgent"
+      ? "#fee2e2"
+      : task.priority === "High"
+      ? "#fff7ed"
+      : "white",
+    color: darkMode ? "#f8fafc" : "#111827",
   }}
 >
-    <td style={tdStyle}>
+<td
+<span style={{ color: darkMode ? "#f8fafc" : "#111827" }}>
+  style={{
+    ...tdStyle,
+    color: darkMode ? "#f8fafc" : "#111827",
+  }}
+>
   {task.stores
     ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
     : task.store}
+    </span>
 </td>
+
     <td style={tdStyle}>{task.issue}</td>
     <td style={tdStyle}>{task.category || "General"}</td>
     <td style={{ ...tdStyle, color: getPriorityColor(task.priority || "Medium"), fontWeight: "bold" }}>
@@ -1257,12 +1276,13 @@ whiteSpace: "nowrap",
   <div>
     {selectedTask && (
       <div
-        style={{
-          background: "#eff6ff",
-          padding: "20px",
-          borderRadius: "14px",
-          marginBottom: "20px",
-        }}
+      style={{
+        background: darkMode ? "#334155" : "#eff6ff",
+        color: darkMode ? "#f8fafc" : "#111827",
+        padding: "20px",
+        borderRadius: "14px",
+        marginBottom: "20px",
+      }}
       >
         <h2>{selectedTask.store}</h2>
         <p><strong>Issue:</strong> {selectedTask.issue}</p>
@@ -1371,16 +1391,21 @@ const numberStyle = {
 const thStyle = {
   textAlign: "left" as const,
   padding: "12px",
+  color: darkMode ? "#f8fafc" : "#111827",
 };
 
 const tdStyle = {
   padding: "12px",
+  color: darkMode ? "#f8fafc" : "#111827",
+  fontWeight: "500",
 };
 
 const inputStyle = {
   padding: "14px",
   borderRadius: "10px",
-  border: "1px solid #ddd",
+  border: `1px solid ${borderColor}`,
+  background: inputBg,
+  color: textColor,
   fontSize: "16px",
 };
 
