@@ -173,16 +173,11 @@ location: "",
     task.technician?.toLowerCase().includes(search) ||
     task.employees?.full_name?.toLowerCase().includes(search);
   
-        const roleAccess =
-        isAdmin ||
-      
-        (isManager &&
-          task.category === currentEmployee?.department) ||
-      
-        (isTechnician &&
-          task.employee_id === currentEmployee?.id) ||
-      
-        isViewer;
+    const roleAccess =
+    isAdmin ||
+    (isManager && task.department === currentEmployee?.department) ||
+    (isTechnician && task.employee_id === currentEmployee?.id) ||
+    isViewer;
       
       return (
         roleAccess &&
@@ -268,6 +263,7 @@ location: newTask.location || "",
         issue: newTask.issue,
         status: newTask.status,
         category: newTask.category,
+        department: newTask.category,
         priority: newTask.priority,
         due_date: newTask.due_date || null,
         employee_id: newTask.employee_id || null,
