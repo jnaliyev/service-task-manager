@@ -1083,10 +1083,21 @@ location: selectedStore?.location || "",
     <option>Completed</option>
   </select>
 ) : (
-  <span style={{ color: getStatusColor(task.status), fontWeight: "bold" }}>
-    {task.status}
-  </span>
-)}
+  <span
+  style={{
+    background: getStatusColor(task.status),
+    color: "white",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    fontWeight: "bold",
+    fontSize: "12px",
+    display: "inline-block",
+    minWidth: "110px",
+    textAlign: "center",
+  }}
+>
+  {task.status}
+</span>
 
     </td>
     <td style={tdStyle}>
