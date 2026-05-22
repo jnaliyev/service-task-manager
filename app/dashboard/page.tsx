@@ -1339,8 +1339,8 @@ color: darkMode ? "#f9fafb" : "#111827",
 
 
 const cardStyle = {
-  background: darkMode ? "#1f2937" : "white",
-  color: darkMode ? "#f9fafb" : "#111827",
+  background: "white",
+  color: "#111827",
   padding: "16px",
   borderRadius: "12px",
   boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
