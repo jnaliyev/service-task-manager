@@ -1045,7 +1045,6 @@ location: selectedStore?.location || "",
         color: darkMode ? "#f8fafc" : "#111827",
       }}
     >
-  >
           <thead>
             <tr>
               <th style={thStyle}>Store</th>
@@ -1078,16 +1077,16 @@ location: selectedStore?.location || "",
   }}
 >
 <td
-<span style={{ color: darkMode ? "#f8fafc" : "#111827" }}>
   style={{
     ...tdStyle,
     color: darkMode ? "#f8fafc" : "#111827",
   }}
 >
-  {task.stores
-    ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
-    : task.store}
-    </span>
+  <span style={{ color: darkMode ? "#f8fafc" : "#111827" }}>
+    {task.stores
+      ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
+      : task.store}
+  </span>
 </td>
 
     <td style={tdStyle}>{task.issue}</td>
@@ -1391,21 +1390,18 @@ const numberStyle = {
 const thStyle = {
   textAlign: "left" as const,
   padding: "12px",
-  color: darkMode ? "#f8fafc" : "#111827",
 };
 
 const tdStyle = {
   padding: "12px",
-  color: darkMode ? "#f8fafc" : "#111827",
+
   fontWeight: "500",
 };
 
 const inputStyle = {
   padding: "14px",
   borderRadius: "10px",
-  border: `1px solid ${borderColor}`,
-  background: inputBg,
-  color: textColor,
+  border: "1px solid #ddd",
   fontSize: "16px",
 };
 
