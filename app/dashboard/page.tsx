@@ -56,6 +56,7 @@ const supabase = createClient(
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedPhotoTaskId, setSelectedPhotoTaskId] = useState<number | null>(null); 
@@ -103,6 +104,17 @@ const [locationFilter, setLocationFilter] = useState("All");
 location: "",
   });
 
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+  
+    checkMobile();
+  
+    window.addEventListener("resize", checkMobile);
+  
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
   useEffect(() => {
     async function checkUser() {
       const {
@@ -972,7 +984,8 @@ location: selectedStore?.location || "",
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Service Tasks</h2>
   <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-  <div
+  {isMobile && (
+    <div
   className="md:hidden"
   style={{
     flexDirection: "column",
@@ -992,12 +1005,13 @@ location: selectedStore?.location || "",
     />
   ))}
 </div>
+)}
   </div>
 
-  <div
-    className="hidden md:block"
-    style={{ overflowX: "auto", width: "100%" }}
-  >
+  {!isMobile && (
+<div
+  style={{ overflowX: "auto", width: "100%" }}
+>
 >
   <table
     style={{
@@ -1206,6 +1220,7 @@ Status: ${task.status}`
 </tbody>
 </table>
 </div>
+)}
 </div>  
 
 {selectedTaskId && (
