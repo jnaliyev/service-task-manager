@@ -1355,10 +1355,10 @@ const panelStyle = {
 };
 
 const numberStyle = {
-  fontSize: "24px",
+  fontSize: "28px",
   fontWeight: "bold",
   margin: "8px 0",
-  color: darkMode ? "#f9fafb" : "#111827",
+  color: "#111827",
 };
 
 const thStyle = {
