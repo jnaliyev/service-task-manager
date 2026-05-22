@@ -607,6 +607,20 @@ return (
           <p style={numberStyle}>{employees.length}</p>
         </div>
       </div>
+      <div style={{ marginTop: "30px" }}>
+  <h2>Department Overview</h2>
+
+  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "15px" }}>
+    {["General", "Construction", "Systems", "Inventory"].map((department) => (
+      <div key={department} style={cardStyle}>
+        <h3>{department}</h3>
+        <p style={numberStyle}>
+          {tasks.filter((task) => task.department === department || task.category === department).length}
+        </p>
+      </div>
+    ))}
+  </div>
+</div>
 
       {currentEmployee?.role?.toLowerCase() !== "technician" && (
   <button onClick={() => setShowForm(!showForm)} style={buttonStyle}>
