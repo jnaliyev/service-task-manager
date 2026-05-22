@@ -1012,7 +1012,6 @@ location: selectedStore?.location || "",
 <div
   style={{ overflowX: "auto", width: "100%" }}
 >
->
   <table
     style={{
       width: "100%",
