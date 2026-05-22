@@ -993,9 +993,11 @@ location: selectedStore?.location || "",
   ))}
 </div>
   </div>
+
   <div
- 
-  style={{ overflowX: "auto", width: "100%" }}
+    className="hidden md:block"
+    style={{ overflowX: "auto", width: "100%" }}
+  >
 >
   <table
     style={{
