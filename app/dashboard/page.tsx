@@ -162,19 +162,37 @@ location: "",
   locationFilter === "All" ||
   task.stores?.location === locationFilter;
   
-      const matchSearch =
-        task.store?.toLowerCase().includes(searchText.toLowerCase()) ||
-        task.issue?.toLowerCase().includes(searchText.toLowerCase()) ||
-        task.technician?.toLowerCase().includes(searchText.toLowerCase());
+  const search = searchText.toLowerCase();
+
+  const matchSearch =
+    task.store?.toLowerCase().includes(search) ||
+    task.stores?.store_name?.toLowerCase().includes(search) ||
+    task.stores?.company_name?.toLowerCase().includes(search) ||
+    task.stores?.location?.toLowerCase().includes(search) ||
+    task.issue?.toLowerCase().includes(search) ||
+    task.technician?.toLowerCase().includes(search) ||
+    task.employees?.full_name?.toLowerCase().includes(search);
   
-        return (
-          matchStatus &&
-          matchEmployee &&
-          matchCategory &&
-          matchCompany &&
-          matchLocation &&
-          matchSearch
-        );
+        const roleAccess =
+        isAdmin ||
+      
+        (isManager &&
+          task.category === currentEmployee?.department) ||
+      
+        (isTechnician &&
+          task.employee_id === currentEmployee?.id) ||
+      
+        isViewer;
+      
+      return (
+        roleAccess &&
+        matchStatus &&
+        matchEmployee &&
+        matchCategory &&
+        matchCompany &&
+        matchLocation &&
+        matchSearch
+      );
     });
   }, 
   [
