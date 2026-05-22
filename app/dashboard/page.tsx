@@ -1166,7 +1166,7 @@ Status: ${task.status}`
     }}
   />
 </label>
-      {currentEmployee?.role?.toLowerCase() !== "technician" && (
+{currentEmployee?.role?.toLowerCase() === "admin" && (
         <button
           onClick={() => deleteTask(task.id)}
           style={{
