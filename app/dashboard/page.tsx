@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 import TaskMobileCard from "../components/TaskMobileCard";
+import TaskTable from "../components/TaskTable";
 
 type Employee = {
   id: string;
@@ -1009,9 +1010,7 @@ location: selectedStore?.location || "",
   </div>
 
   {!isMobile && (
-<div
-  style={{ overflowX: "auto", width: "100%" }}
->
+    <TaskTable>
   <table
     style={{
       width: "100%",
@@ -1218,7 +1217,7 @@ Status: ${task.status}`
 ))}
 </tbody>
 </table>
-</div>
+</TaskTable>
 )}
 </div>  
 
