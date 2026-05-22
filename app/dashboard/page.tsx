@@ -641,7 +641,9 @@ return (
    
         </div>
         <div style={cardStyle}>
-  <h3>Total Tasks</h3>
+        <h3 style={{ color: darkMode ? "#f9fafb" : "#111827" }}>
+  Total Tasks
+</h3>
   <p style={numberStyle}>{tasks.length}</p>
 </div>
 
@@ -1337,7 +1339,8 @@ color: darkMode ? "#f9fafb" : "#111827",
 
 
 const cardStyle = {
-  background: "white",
+  background: darkMode ? "#1f2937" : "white",
+  color: darkMode ? "#f9fafb" : "#111827",
   padding: "16px",
   borderRadius: "12px",
   boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
@@ -1355,6 +1358,7 @@ const numberStyle = {
   fontSize: "24px",
   fontWeight: "bold",
   margin: "8px 0",
+  color: darkMode ? "#f9fafb" : "#111827",
 };
 
 const thStyle = {
