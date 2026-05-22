@@ -77,6 +77,7 @@ const canCreateTask =
 const canManageEmployees =
   isAdmin;
   const [showForm, setShowForm] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
   const [employeeFilter, setEmployeeFilter] = useState("All");
 
@@ -175,7 +176,7 @@ location: "",
   
     const roleAccess =
     isAdmin ||
-    (isManager && task.department === currentEmployee?.department) ||
+    isManager ||
     (isTechnician && task.employee_id === currentEmployee?.id) ||
     isViewer;
       
@@ -500,7 +501,32 @@ async function uploadPhoto(taskId: number, file: File) {
   loadPhotos(taskId);
 }
 return (
-    <main style={{ padding: "40px", fontFamily: "Arial", background: "#f5f7fb", minHeight: "100vh" }}>
+  <main
+  style={{
+    padding: "40px",
+    fontFamily: "Arial",
+    background: darkMode ? "#0f172a" : "#f5f7fb",
+    color: darkMode ? "white" : "black",
+    minHeight: "100vh",
+    transition: "0.3s",
+  }}
+>
+<div style={{ marginBottom: "20px" }}>
+  <button
+    onClick={() => setDarkMode(!darkMode)}
+    style={{
+      background: darkMode ? "#334155" : "#111827",
+      color: "white",
+      border: "none",
+      padding: "10px 18px",
+      borderRadius: "10px",
+      cursor: "pointer",
+      fontWeight: "bold",
+    }}
+  >
+    {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+  </button>
+</div>
       <div
   style={{
     display: "flex",
@@ -509,9 +535,37 @@ return (
     marginBottom: "30px",
   }}
 >
-<h1 style={{ fontSize: "clamp(28px, 5vw, 42px)" }}>
-    Retail Systems Service Dashboard
-  </h1>
+<div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+  <img
+    src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg"
+    alt="logo"
+    style={{
+      width: "50px",
+      height: "50px",
+    }}
+  />
+
+  <div>
+    <h1
+      style={{
+        fontSize: "clamp(28px, 5vw, 42px)",
+        margin: 0,
+      }}
+    >
+      Retail Systems
+    </h1>
+
+    <p
+      style={{
+        margin: 0,
+        color: "#64748b",
+        fontSize: "14px",
+      }}
+    >
+      Service Management Platform
+    </p>
+  </div>
+</div>
 
   <button
     onClick={async () => {
