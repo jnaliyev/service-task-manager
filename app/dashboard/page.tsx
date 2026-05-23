@@ -1218,20 +1218,7 @@ location: selectedStore?.location || "",
   {task.priority || "Medium"}
 </span>
 
-    {task.priority === "High" && (
-      <span
-        style={{
-          background: "#f97316",
-          color: "white",
-          padding: "2px 8px",
-          borderRadius: "999px",
-          fontSize: "11px",
-          fontWeight: 600,
-        }}
-      >
-        HIGH
-      </span>
-    )}
+    
 
     {task.priority === "Urgent" && (
       <span
