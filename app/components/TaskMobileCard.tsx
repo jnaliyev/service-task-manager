@@ -61,23 +61,38 @@ type Props = {
             Comments
           </button>
   
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(
-              `Task: ${task.issue}
-  Store: ${task.store}
-  Status: ${task.status}`
-            )}`}
-            target="_blank"
-            style={{
-              background: "#25D366",
-              color: "white",
-              padding: "10px 14px",
-              borderRadius: "8px",
-              textDecoration: "none",
-            }}
-          >
-            WhatsApp
-          </a>
+          <button
+  onClick={() => {
+    const text = `
+🚨 NEW SERVICE TASK
+
+Store: ${task.stores?.store_name || task.store || ""}
+Location: ${task.stores?.location || ""}
+Department: ${task.category || ""}
+Issue: ${task.issue || ""}
+Priority: ${task.priority || ""}
+Status: ${task.status || ""}
+Technician: ${task.technician || "Not assigned"}
+
+Created via Retail Systems Service Manager
+`;
+
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text.trim())}`,
+      "_blank"
+    );
+  }}
+  style={{
+    background: "#25D366",
+    color: "white",
+    padding: "10px 14px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+  }}
+>
+  WhatsApp Message
+</button>
         </div>
       </div>
     );
