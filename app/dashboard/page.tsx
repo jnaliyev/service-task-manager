@@ -918,11 +918,23 @@ location: selectedStore?.location || "",
       </div>
     ))}
 </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "15px", marginTop: "20px" }}>
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "15px",
+    marginTop: "20px",
+    width: "100%",
+  }}
+>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={inputStyle}
+            style={{
+              ...inputStyle,
+              width: "100%",
+              minWidth: "0",
+            }}
           >
             <option>All</option>
             <option>Open</option>
@@ -934,7 +946,11 @@ location: selectedStore?.location || "",
           <select
             value={employeeFilter}
             onChange={(e) => setEmployeeFilter(e.target.value)}
-            style={inputStyle}
+            style={{
+              ...inputStyle,
+              width: isMobile ? "100%" : "250px",
+              minWidth: "0",
+            }}
           >
             <option value="All">All employees</option>
             {employees.map((employee) => (
@@ -946,7 +962,11 @@ location: selectedStore?.location || "",
           <select
   value={categoryFilter}
   onChange={(e) => setCategoryFilter(e.target.value)}
-  style={inputStyle}
+  style={{
+    ...inputStyle,
+    width: isMobile ? "100%" : "250px",
+    minWidth: "0",
+  }}
 >
 <option>All</option>
 <option>General</option>
@@ -995,15 +1015,36 @@ location: selectedStore?.location || "",
     
         </div>
 
-        <p style={{ marginTop: "15px", color: "#6b7280" }}>
-          Showing {filteredTasks.length} of {tasks.length} tasks
-          <button
-  onClick={exportTasks}
-  style={{ ...buttonStyle, marginTop: "15px" }}
+        <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
+    marginTop: "20px",
+  }}
 >
-  Export CSV
-</button>
-        </p>
+  <span
+    style={{
+      fontSize: "14px",
+      color: darkMode ? "#cbd5e1" : "#6b7280",
+      flex: "1 1 180px",
+    }}
+  >
+    Showing {filteredTasks.length} of {tasks.length} tasks
+  </span>
+
+  <button
+    onClick={exportTasks}
+    style={{
+      ...buttonStyle,
+      width: "100%",
+    }}
+  >
+    Export CSV
+  </button>
+</div>
       </div>
 
       <div style={{ ...panelStyle, marginTop: "30px" }}>
