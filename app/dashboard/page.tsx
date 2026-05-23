@@ -293,6 +293,7 @@ location: "",
       due_date: newTask.due_date || null,
       employee_id: newTask.employee_id || null,
       technician: selectedEmployee?.full_name || "",
+      created_by: currentEmployee?.full_name || "",
     };
 
     const { error } = editingTask
@@ -1259,7 +1260,7 @@ Technician: ${
   "Not assigned"
 }
 
-Created by: ${currentEmployee?.full_name || "Retail Systems"}
+Created by: ${task.created_by || currentEmployee?.full_name || "Retail Systems"}
 `;
 
     window.open(
