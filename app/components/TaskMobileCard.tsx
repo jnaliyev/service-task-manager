@@ -138,6 +138,25 @@ type Props = {
 </div>
         <p><b>Priority:</b> {task.priority}</p>
         <p><b>Technician:</b> {task.technician}</p>
+        {task.status !== "Completed" && (
+  <button
+    onClick={() => updateStatus(task.id, "Completed")}
+    style={{
+      background: "#16a34a",
+      color: "white",
+      width: "100%",
+      padding: "12px",
+      borderRadius: "10px",
+      border: "none",
+      fontWeight: "bold",
+      marginTop: "12px",
+      fontSize: "15px",
+      cursor: "pointer",
+    }}
+  >
+    ✅ Mark as Completed
+  </button>
+)}
   
         <div
   style={{
