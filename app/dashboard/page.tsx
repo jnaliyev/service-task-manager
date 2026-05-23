@@ -91,6 +91,7 @@ const textColor = darkMode ? "#f8fafc" : "#111827";
 const inputBg = darkMode ? "#334155" : "white";
 const borderColor = darkMode ? "#475569" : "#d1d5db";
   const [statusFilter, setStatusFilter] = useState("All");
+  const [storeFilter, setStoreFilter] = useState("All");
   const [employeeFilter, setEmployeeFilter] = useState("All");
 
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -534,6 +535,29 @@ async function uploadPhoto(taskId: number, file: File) {
 
   loadPhotos(taskId);
 }
+function copyWhatsAppTask(task: Task) {
+  const text = `
+🚨 NEW SERVICE TASK
+
+Store: ${task.stores?.store_name || task.store || ""}
+Location: ${task.stores?.location || task.location || ""}
+Department: ${task.category || ""}
+Issue: ${task.issue || ""}
+Priority: ${task.priority || ""}
+Status: ${task.status || ""}
+Technician: ${
+  task.technician ||
+  employees.find((employee) => employee.id === task.employee_id)?.full_name ||
+  "Not assigned"
+}
+
+Created via Retail Systems Service Manager
+`;
+
+  navigator.clipboard.writeText(text.trim());
+
+  alert("Task text copied for WhatsApp group");
+}
 return (
   <main
   style={{
@@ -942,7 +966,25 @@ location: selectedStore?.location || "",
             <option>Waiting Parts</option>
             <option>Completed</option>
           </select>
+          <select
+  value={storeFilter}
+  onChange={(e) => setStoreFilter(e.target.value)}
+  style={{
+    ...inputStyle,
+    width: "100%",
+    minWidth: "0",
+  }}
+>
+  <option value="All">All stores</option>
 
+  {stores
+  .filter((store) => store.store_name && store.location)
+  .map((store) => (
+    <option key={store.id} value={store.id}>
+      {store.store_name} — {store.location}
+    </option>
+  ))}
+</select>
           <select
             value={employeeFilter}
             onChange={(e) => setEmployeeFilter(e.target.value)}
@@ -968,7 +1010,7 @@ location: selectedStore?.location || "",
     minWidth: "0",
   }}
 >
-<option>All</option>
+<option value="All">All departments</option>
 <option>General</option>
 <option>Systems</option>
 <option>Construction</option>
@@ -981,7 +1023,7 @@ location: selectedStore?.location || "",
 >
   <option value="All">All companies</option>
 
-  {[...new Set(tasks.map((t) => t.stores?.company_name))]
+  {[...new Set(stores.map((s) => s.company_name))]
     .filter(Boolean)
     .map((company) => (
       <option key={company} value={company}>
@@ -990,21 +1032,7 @@ location: selectedStore?.location || "",
     ))}
 </select>
 
-<select
-  value={locationFilter}
-  onChange={(e) => setLocationFilter(e.target.value)}
-  style={inputStyle}
->
-  <option value="All">All locations</option>
 
-  {[...new Set(stores.map((s) => s.location))]
-  .filter(Boolean)
-  .map((location) => (
-      <option key={location} value={location}>
-        {location}
-      </option>
-    ))}
-</select>
 
 <input
   placeholder="Search store / issue / technician"
@@ -1236,27 +1264,51 @@ location: selectedStore?.location || "",
     Edit
   </button>
 )}
-        <a
-  href={`https://wa.me/?text=${encodeURIComponent(
-    `Task: ${task.issue}
-Store: ${task.store}
-Status: ${task.status}`
-  )}`}
-  target="_blank"
+<button
+  onClick={() => {
+
+    const text = `
+🚨 NEW SERVICE TASK
+
+Store: ${task.stores?.store_name || task.store || ""}
+Location: ${task.stores?.location || task.location || ""}
+Company: ${task.stores?.company_name || ""}
+
+Department: ${task.category || ""}
+Issue: ${task.issue || ""}
+Priority: ${task.priority || ""}
+Status: ${task.status || ""}
+
+Technician: ${
+  task.technician ||
+  employees.find((employee) => employee.id === task.employee_id)?.full_name ||
+  "Not assigned"
+}
+
+Created via Retail Systems Service Manager
+`;
+
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text.trim())}`,
+      "_blank"
+    );
+  }}
   style={{
     background: "#25D366",
     color: "white",
     padding: "8px 14px",
     borderRadius: "8px",
-    textDecoration: "none",
+    border: "none",
+    cursor: "pointer",
     marginRight: "10px",
     display: "inline-block",
+    whiteSpace: "nowrap",
   }}
 >
-  WhatsApp
-</a>
+WhatsApp Message
+</button>
 
-      <label
+<label
   style={{
     background: "#16a34a",
     color: "white",
@@ -1265,7 +1317,7 @@ Status: ${task.status}`
     cursor: "pointer",
     marginRight: "10px",
     display: "inline-block",
-whiteSpace: "nowrap",
+    whiteSpace: "nowrap",
   }}
 >
   Upload Photo
@@ -1287,21 +1339,7 @@ whiteSpace: "nowrap",
     }}
   />
 </label>
-{currentEmployee?.role?.toLowerCase() === "admin" && (
-        <button
-          onClick={() => deleteTask(task.id)}
-          style={{
-            background: "#dc2626",
-            color: "white",
-            padding: "8px 14px",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-          }}
-        >
-          Delete
-        </button>
-      )}
+        
     </td>
   </tr>
 ))}
