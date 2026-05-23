@@ -1071,6 +1071,7 @@ location: selectedStore?.location || "",
       loadComments={loadComments}
       loadPhotos={loadPhotos}
       setSelectedPhotoTaskId={setSelectedPhotoTaskId}
+      currentEmployee={currentEmployee}
     />
   ))}
 </div>

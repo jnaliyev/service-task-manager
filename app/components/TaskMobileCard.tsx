@@ -9,6 +9,7 @@ type Props = {
     loadPhotos: (taskId: number) => void;
   
     setSelectedPhotoTaskId: (id: number) => void;
+    currentEmployee: any;
   };
   
   export default function TaskMobileCard({
@@ -19,6 +20,7 @@ type Props = {
     loadComments,
     loadPhotos,
     setSelectedPhotoTaskId,
+    currentEmployee,
   }: Props) {
     return (
       <div
