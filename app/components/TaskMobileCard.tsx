@@ -140,27 +140,30 @@ type Props = {
         <p><b>Technician:</b> {task.technician}</p>
   
         <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginTop: "15px",
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            onClick={() => {
-              setSelectedTask(task);
-              setSelectedTaskId(task.id.toString());
-  
-              loadComments(task.id);
-              loadPhotos(task.id);
-  
-              setSelectedPhotoTaskId(task.id);
-            }}
-            style={buttonStyle}
-          >
-            Comments
-            <button
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    marginTop: "15px",
+    width: "100%",
+  }}
+>
+<button
+  onClick={() => {
+    setSelectedTask(task);
+    setSelectedTaskId(task.id.toString());
+
+    loadComments(task.id);
+    loadPhotos(task.id);
+
+    setSelectedPhotoTaskId(task.id);
+  }}
+  style={{ ...buttonStyle, width: "100%" }}
+>
+  Comments
+</button>
+
+<button
   onClick={() => {
     setSelectedPhotoTaskId(task.id);
   }}
@@ -171,11 +174,12 @@ type Props = {
     borderRadius: "8px",
     border: "none",
     cursor: "pointer",
+    width: "100%",
   }}
 >
   Upload Photo
 </button>
-          </button>
+        
   
           <button
   onClick={() => {
