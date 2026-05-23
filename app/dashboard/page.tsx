@@ -1130,6 +1130,7 @@ location: selectedStore?.location || "",
     setSelectedPhotoTaskId={setSelectedPhotoTaskId}
     currentEmployee={currentEmployee}
     highlightStyle={getTaskHighlightStyle(task)}
+    updateStatus={updateStatus}
   />
   ))}
 </div>

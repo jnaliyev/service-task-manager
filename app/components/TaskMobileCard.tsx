@@ -2,6 +2,7 @@ type Props = {
     task: any;
     buttonStyle: React.CSSProperties;
     highlightStyle: React.CSSProperties;
+    updateStatus: (taskId: number, status: string) => void;
   
     setSelectedTask: (task: any) => void;
     setSelectedTaskId: (id: string) => void;
@@ -23,6 +24,8 @@ type Props = {
     loadPhotos,
     setSelectedPhotoTaskId,
     currentEmployee,
+    updateStatus,
+ 
   }: Props) {
     return (
       <div
@@ -112,7 +115,27 @@ type Props = {
 </div>
   
         <p><b>Issue:</b> {task.issue}</p>
-        <p><b>Status:</b> {task.status}</p>
+        <div style={{ marginTop: "10px", marginBottom: "10px" }}>
+  <b>Status:</b>
+
+  <select
+    value={task.status}
+    onChange={(e) => updateStatus(task.id, e.target.value)}
+    style={{
+      marginLeft: "10px",
+      padding: "8px",
+      borderRadius: "8px",
+      border: "1px solid #ccc",
+      background: "white",
+      fontWeight: "bold",
+    }}
+  >
+    <option>Open</option>
+    <option>In Progress</option>
+    <option>Waiting Parts</option>
+    <option>Completed</option>
+  </select>
+</div>
         <p><b>Priority:</b> {task.priority}</p>
         <p><b>Technician:</b> {task.technician}</p>
   
