@@ -286,7 +286,7 @@ location: "",
     const taskPayload = {
       store: newTask.store,
       company_name: newTask.company_name || "",
-      Location: ${task.stores?.location || ""}
+      location: newTask.location || "",
       store_id: newTask.store_id ? Number(newTask.store_id) : null,
       issue: newTask.issue,
       status: newTask.status,
