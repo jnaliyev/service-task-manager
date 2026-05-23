@@ -286,7 +286,7 @@ location: "",
     const taskPayload = {
       store: newTask.store,
       company_name: newTask.company_name || "",
-      location: newTask.location || "",
+      Location: ${task.stores?.location || ""}
       store_id: newTask.store_id ? Number(newTask.store_id) : null,
       issue: newTask.issue,
       status: newTask.status,
@@ -540,7 +540,7 @@ function copyWhatsAppTask(task: Task) {
 🚨 NEW SERVICE TASK
 
 Store: ${task.stores?.store_name || task.store || ""}
-Location: ${task.stores?.location || task.location || ""}
+Location: ${task.stores?.location || ""}
 Department: ${task.category || ""}
 Issue: ${task.issue || ""}
 Priority: ${task.priority || ""}
@@ -1271,7 +1271,7 @@ location: selectedStore?.location || "",
 🚨 NEW SERVICE TASK
 
 Store: ${task.stores?.store_name || task.store || ""}
-Location: ${task.stores?.location || task.location || ""}
+Location: ${task.stores?.location || ""}
 Company: ${task.stores?.company_name || ""}
 
 Department: ${task.category || ""}
