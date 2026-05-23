@@ -866,7 +866,7 @@ location: selectedStore?.location || "",
     marginBottom: "10px",
   }}
 >
-{[...new Set(tasks.map((t) => t.stores?.company_name))]
+{[...new Set(stores.map((s) => s.company_name))]
   .filter(Boolean)
   .map((company) => (
       <div
@@ -997,9 +997,9 @@ location: selectedStore?.location || "",
 >
   <option value="All">All locations</option>
 
-  {[...new Set(tasks.map((t) => t.stores?.location))]
-    .filter(Boolean)
-    .map((location) => (
+  {[...new Set(stores.map((s) => s.location))]
+  .filter(Boolean)
+  .map((location) => (
       <option key={location} value={location}>
         {location}
       </option>
