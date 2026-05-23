@@ -535,29 +535,7 @@ async function uploadPhoto(taskId: number, file: File) {
 
   loadPhotos(taskId);
 }
-function copyWhatsAppTask(task: Task) {
-  const text = `
-🚨 NEW SERVICE TASK
 
-Store: ${task.stores?.store_name || task.store || ""}
-Location: ${task.stores?.location || ""}
-Department: ${task.category || ""}
-Issue: ${task.issue || ""}
-Priority: ${task.priority || ""}
-Status: ${task.status || ""}
-Technician: ${
-  task.technician ||
-  employees.find((employee) => employee.id === task.employee_id)?.full_name ||
-  "Not assigned"
-}
-
-Created via Retail Systems Service Manager
-`;
-
-  navigator.clipboard.writeText(text.trim());
-
-  alert("Task text copied for WhatsApp group");
-}
 return (
   <main
   style={{
