@@ -305,11 +305,11 @@ location: "",
         .from("tasks")
         .insert([taskPayload]);
 
-    if (error) {
-      console.error(error);
-      alert("Error while saving task");
-      return;
-    }
+        if (error) {
+          console.error(error);
+          alert(error.message);
+          return;
+        }
 
     setNewTask({
       store_id: "",
@@ -532,6 +532,58 @@ async function uploadPhoto(taskId: number, file: File) {
   }
 
   loadPhotos(taskId);
+}
+function isOverdue(task: any) {
+  if (!task.due_date || task.status === "Done" || task.status === "Completed") {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dueDate = new Date(task.due_date);
+  dueDate.setHours(0, 0, 0, 0);
+
+  return dueDate < today;
+}
+
+function isDueToday(task: any) {
+  if (!task.due_date || task.status === "Done" || task.status === "Completed") {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dueDate = new Date(task.due_date);
+  dueDate.setHours(0, 0, 0, 0);
+
+  return dueDate.getTime() === today.getTime();
+}
+
+function getTaskHighlightStyle(task: any) {
+  if (isOverdue(task)) {
+    return {
+      borderLeft: "6px solid #dc2626",
+      background: darkMode ? "#450a0a" : "#fee2e2",
+    };
+  }
+
+  if (task.priority === "High" || task.priority === "Urgent") {
+    return {
+      borderLeft: "6px solid #f97316",
+      background: darkMode ? "#431407" : "#ffedd5",
+    };
+  }
+
+  if (isDueToday(task)) {
+    return {
+      borderLeft: "6px solid #2563eb",
+      background: darkMode ? "#172554" : "#dbeafe",
+    };
+  }
+
+  return {};
 }
 
 return (
@@ -1064,16 +1116,17 @@ location: selectedStore?.location || "",
 >
   {filteredTasks.map((task) => (
     <TaskMobileCard
-      key={task.id}
-      task={task}
-      buttonStyle={buttonStyle}
-      setSelectedTask={setSelectedTask}
-      setSelectedTaskId={setSelectedTaskId}
-      loadComments={loadComments}
-      loadPhotos={loadPhotos}
-      setSelectedPhotoTaskId={setSelectedPhotoTaskId}
-      currentEmployee={currentEmployee}
-    />
+    key={task.id}
+    task={task}
+    buttonStyle={buttonStyle}
+    setSelectedTask={setSelectedTask}
+    setSelectedTaskId={setSelectedTaskId}
+    loadComments={loadComments}
+    loadPhotos={loadPhotos}
+    setSelectedPhotoTaskId={setSelectedPhotoTaskId}
+    currentEmployee={currentEmployee}
+    highlightStyle={getTaskHighlightStyle(task)}
+  />
   ))}
 </div>
 )}

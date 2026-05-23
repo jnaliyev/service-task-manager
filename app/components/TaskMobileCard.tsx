@@ -1,6 +1,7 @@
 type Props = {
     task: any;
     buttonStyle: React.CSSProperties;
+    highlightStyle: React.CSSProperties;
   
     setSelectedTask: (task: any) => void;
     setSelectedTaskId: (id: string) => void;
@@ -15,6 +16,7 @@ type Props = {
   export default function TaskMobileCard({
     task,
     buttonStyle,
+    highlightStyle,
     setSelectedTask,
     setSelectedTaskId,
     loadComments,
@@ -25,6 +27,7 @@ type Props = {
     return (
       <div
         style={{
+          ...highlightStyle,
           background: "white",
           padding: "16px",
           borderRadius: "16px",
@@ -34,6 +37,79 @@ type Props = {
         <h3 style={{ marginBottom: "10px" }}>
           {task.stores?.store_name || task.store}
         </h3>
+        <div
+  style={{
+    display: "flex",
+    gap: "6px",
+    flexWrap: "wrap",
+    marginTop: "8px",
+    marginBottom: "10px",
+  }}
+>
+  {task.priority === "High" && (
+    <span
+      style={{
+        background: "#f97316",
+        color: "white",
+        padding: "4px 8px",
+        borderRadius: "999px",
+        fontSize: "12px",
+        fontWeight: 600,
+      }}
+    >
+      HIGH
+    </span>
+  )}
+
+  {task.priority === "Urgent" && (
+    <span
+      style={{
+        background: "#dc2626",
+        color: "white",
+        padding: "4px 8px",
+        borderRadius: "999px",
+        fontSize: "12px",
+        fontWeight: 600,
+      }}
+    >
+      URGENT
+    </span>
+  )}
+
+  {task.due_date &&
+    new Date(task.due_date).toDateString() ===
+      new Date().toDateString() && (
+      <span
+        style={{
+          background: "#2563eb",
+          color: "white",
+          padding: "4px 8px",
+          borderRadius: "999px",
+          fontSize: "12px",
+          fontWeight: 600,
+        }}
+      >
+        TODAY
+      </span>
+    )}
+
+  {task.due_date &&
+    new Date(task.due_date) < new Date(new Date().setHours(0, 0, 0, 0)) &&
+    task.status !== "Done" && (
+      <span
+        style={{
+          background: "#991b1b",
+          color: "white",
+          padding: "4px 8px",
+          borderRadius: "999px",
+          fontSize: "12px",
+          fontWeight: 600,
+        }}
+      >
+        OVERDUE
+      </span>
+    )}
+</div>
   
         <p><b>Issue:</b> {task.issue}</p>
         <p><b>Status:</b> {task.status}</p>
