@@ -75,7 +75,7 @@ Priority: ${task.priority || ""}
 Status: ${task.status || ""}
 Technician: ${task.technician || "Not assigned"}
 
-Created by: Retail Systems
+Created by: ${currentEmployee?.full_name || currentEmployee?.email || "Retail Systems"}
 `;
 
     window.open(
