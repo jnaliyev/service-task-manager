@@ -1220,20 +1220,7 @@ location: selectedStore?.location || "",
 
     
 
-    {task.priority === "Urgent" && (
-      <span
-        style={{
-          background: "#dc2626",
-          color: "white",
-          padding: "2px 8px",
-          borderRadius: "999px",
-          fontSize: "11px",
-          fontWeight: 600,
-        }}
-      >
-        URGENT
-      </span>
-    )}
+  
 
     {task.due_date &&
       new Date(task.due_date).toDateString() ===
