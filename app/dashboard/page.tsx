@@ -928,7 +928,7 @@ location: selectedStore?.location || "",
         </div>
         </TaskForm>
       )}
-
+{currentEmployee?.role !== "Technician" && (
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Filters / Reporting</h2>
         <div
@@ -1106,7 +1106,7 @@ location: selectedStore?.location || "",
   </button>
 </div>
       </div>
-
+)}
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Service Tasks</h2>
   <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
