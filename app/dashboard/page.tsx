@@ -183,9 +183,7 @@ location: "",
   companyFilter === "All" ||
   task.stores?.company_name === companyFilter;
 
-  const matchLocation =
-  locationFilter === "All" ||
-  task.stores?.location === locationFilter;
+ 
   
   const search = searchText.toLowerCase();
 
@@ -210,7 +208,6 @@ location: "",
         matchEmployee &&
         matchCategory &&
         matchCompany &&
-        matchLocation &&
         matchSearch
       );
     });
@@ -1249,8 +1246,6 @@ location: selectedStore?.location || "",
 🚨 NEW SERVICE TASK
 
 Store: ${task.stores?.store_name || task.store || ""}
-Location: ${task.stores?.location || ""}
-Company: ${task.stores?.company_name || ""}
 
 Department: ${task.category || ""}
 Issue: ${task.issue || ""}

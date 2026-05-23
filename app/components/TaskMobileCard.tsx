@@ -67,8 +67,7 @@ type Props = {
 🚨 NEW SERVICE TASK
 
 Store: ${task.stores?.store_name || task.store || ""}
-Location: ${task.stores?.location || ""}
-Department: ${task.category || ""}
+
 Issue: ${task.issue || ""}
 Priority: ${task.priority || ""}
 Status: ${task.status || ""}
