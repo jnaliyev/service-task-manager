@@ -704,6 +704,7 @@ color: textColor,
   </div>
 )}
 
+{currentEmployee?.role !== "Technician" && (
 <div
   style={{
     display: "grid",
@@ -769,6 +770,7 @@ color: textColor,
           <p style={numberStyle}>{employees.length}</p>
         </div>
       </div>
+      )}
       <div style={{ marginTop: "30px" }}>
   <h2>Department Overview</h2>
 
