@@ -1258,7 +1258,7 @@ Technician: ${
   "Not assigned"
 }
 
-Created via Retail Systems Service Manager
+Created by: ${currentEmployee?.full_name || "Retail Systems"}
 `;
 
     window.open(
