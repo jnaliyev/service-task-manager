@@ -160,6 +160,21 @@ type Props = {
             style={buttonStyle}
           >
             Comments
+            <button
+  onClick={() => {
+    setSelectedPhotoTaskId(task.id);
+  }}
+  style={{
+    background: "#16a34a",
+    color: "white",
+    padding: "10px 14px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+  }}
+>
+  Upload Photo
+</button>
           </button>
   
           <button
