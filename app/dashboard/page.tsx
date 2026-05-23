@@ -585,7 +585,27 @@ function getTaskHighlightStyle(task: any) {
 
   return {};
 }
+const sortedTasks = [...filteredTasks].sort((a, b) => {
+  const getScore = (task: any) => {
+    if (isOverdue(task)) return 1;
+    if (task.priority === "Urgent") return 2;
+    if (task.priority === "High") return 3;
+    if (isDueToday(task)) return 4;
+    return 5;
+  };
 
+  const scoreA = getScore(a);
+  const scoreB = getScore(b);
+
+  if (scoreA !== scoreB) {
+    return scoreA - scoreB;
+  }
+
+  const dateA = new Date(a.created_at || 0).getTime();
+  const dateB = new Date(b.created_at || 0).getTime();
+
+  return dateB - dateA;
+});
 return (
   <main
   style={{
@@ -1096,7 +1116,7 @@ location: selectedStore?.location || "",
     gap: "15px",
   }}
 >
-  {filteredTasks.map((task) => (
+  {sortedTasks.map((task) => (
     <TaskMobileCard
     key={task.id}
     task={task}
@@ -1140,7 +1160,7 @@ location: selectedStore?.location || "",
           </thead>
 
           <tbody>
-          {filteredTasks.map((task) => (
+          {sortedTasks.map((task) => (
   <tr
   key={task.id}
   style={{
