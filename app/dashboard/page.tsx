@@ -1162,15 +1162,12 @@ location: selectedStore?.location || "",
   <tr
   key={task.id}
   style={{
+    ...getTaskHighlightStyle(task),
     background: darkMode
       ? "#1e293b"
       : task.status === "Completed"
       ? "#ecfdf5"
-      : task.priority === "Urgent"
-      ? "#fee2e2"
-      : task.priority === "High"
-      ? "#fff7ed"
-      : "white",
+      : getTaskHighlightStyle(task).background || "white",
     color: darkMode ? "#f8fafc" : "#111827",
   }}
 >
@@ -1189,9 +1186,105 @@ location: selectedStore?.location || "",
 
     <td style={tdStyle}>{task.issue}</td>
     <td style={tdStyle}>{task.category || "General"}</td>
-    <td style={{ ...tdStyle, color: getPriorityColor(task.priority || "Medium"), fontWeight: "bold" }}>
-      {task.priority || "Medium"}
-    </td>
+    <td style={{ ...tdStyle }}>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      flexWrap: "wrap",
+    }}
+  >
+    <span
+  style={{
+    background:
+      task.priority === "Urgent"
+        ? "#dc2626"
+        : task.priority === "High"
+        ? "#f97316"
+        : task.priority === "Low"
+        ? "#16a34a"
+        : "#2563eb",
+    color: "white",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    fontWeight: "bold",
+    fontSize: "12px",
+    display: "inline-block",
+    minWidth: "90px",
+    textAlign: "center",
+  }}
+>
+  {task.priority || "Medium"}
+</span>
+
+    {task.priority === "High" && (
+      <span
+        style={{
+          background: "#f97316",
+          color: "white",
+          padding: "2px 8px",
+          borderRadius: "999px",
+          fontSize: "11px",
+          fontWeight: 600,
+        }}
+      >
+        HIGH
+      </span>
+    )}
+
+    {task.priority === "Urgent" && (
+      <span
+        style={{
+          background: "#dc2626",
+          color: "white",
+          padding: "2px 8px",
+          borderRadius: "999px",
+          fontSize: "11px",
+          fontWeight: 600,
+        }}
+      >
+        URGENT
+      </span>
+    )}
+
+    {task.due_date &&
+      new Date(task.due_date).toDateString() ===
+        new Date().toDateString() && (
+        <span
+          style={{
+            background: "#2563eb",
+            color: "white",
+            padding: "2px 8px",
+            borderRadius: "999px",
+            fontSize: "11px",
+            fontWeight: 600,
+          }}
+        >
+          TODAY
+        </span>
+      )}
+
+    {task.due_date &&
+      new Date(task.due_date) <
+        new Date(new Date().setHours(0, 0, 0, 0)) &&
+      task.status !== "Done" &&
+      task.status !== "Completed" && (
+        <span
+          style={{
+            background: "#991b1b",
+            color: "white",
+            padding: "2px 8px",
+            borderRadius: "999px",
+            fontSize: "11px",
+            fontWeight: 600,
+          }}
+        >
+          OVERDUE
+        </span>
+      )}
+  </div>
+</td>
     <td style={tdStyle}>{task.due_date || "-"}</td>
     <td style={tdStyle}>
       {task.employees?.full_name || task.technician || "Not assigned"}
