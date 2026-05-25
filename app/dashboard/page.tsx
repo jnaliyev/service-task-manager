@@ -91,7 +91,6 @@ const textColor = darkMode ? "#f8fafc" : "#111827";
 const inputBg = darkMode ? "#334155" : "white";
 const borderColor = darkMode ? "#475569" : "#d1d5db";
   const [statusFilter, setStatusFilter] = useState("All");
-  const [storeFilter, setStoreFilter] = useState("All");
   const [employeeFilter, setEmployeeFilter] = useState("All");
 
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -183,7 +182,9 @@ location: "",
   companyFilter === "All" ||
   task.stores?.company_name === companyFilter;
 
- 
+  const matchLocation =
+  locationFilter === "All" ||
+  task.stores?.location === locationFilter;
   
   const search = searchText.toLowerCase();
 
@@ -208,6 +209,7 @@ location: "",
         matchEmployee &&
         matchCategory &&
         matchCompany &&
+        matchLocation &&
         matchSearch
       );
     });
@@ -293,7 +295,6 @@ location: "",
       due_date: newTask.due_date || null,
       employee_id: newTask.employee_id || null,
       technician: selectedEmployee?.full_name || "",
-      created_by: currentEmployee?.full_name || "",
     };
 
     const { error } = editingTask
@@ -305,11 +306,11 @@ location: "",
         .from("tasks")
         .insert([taskPayload]);
 
-        if (error) {
-          console.error(error);
-          alert(error.message);
-          return;
-        }
+    if (error) {
+      console.error(error);
+      alert("Error while saving task");
+      return;
+    }
 
     setNewTask({
       store_id: "",
@@ -533,79 +534,6 @@ async function uploadPhoto(taskId: number, file: File) {
 
   loadPhotos(taskId);
 }
-function isOverdue(task: any) {
-  if (!task.due_date || task.status === "Done" || task.status === "Completed") {
-    return false;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const dueDate = new Date(task.due_date);
-  dueDate.setHours(0, 0, 0, 0);
-
-  return dueDate < today;
-}
-
-function isDueToday(task: any) {
-  if (!task.due_date || task.status === "Done" || task.status === "Completed") {
-    return false;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const dueDate = new Date(task.due_date);
-  dueDate.setHours(0, 0, 0, 0);
-
-  return dueDate.getTime() === today.getTime();
-}
-
-function getTaskHighlightStyle(task: any) {
-  if (isOverdue(task)) {
-    return {
-      borderLeft: "6px solid #dc2626",
-      background: darkMode ? "#450a0a" : "#fee2e2",
-    };
-  }
-
-  if (task.priority === "High" || task.priority === "Urgent") {
-    return {
-      borderLeft: "6px solid #f97316",
-      background: darkMode ? "#431407" : "#ffedd5",
-    };
-  }
-
-  if (isDueToday(task)) {
-    return {
-      borderLeft: "6px solid #2563eb",
-      background: darkMode ? "#172554" : "#dbeafe",
-    };
-  }
-
-  return {};
-}
-const sortedTasks = [...filteredTasks].sort((a, b) => {
-  const getScore = (task: any) => {
-    if (isOverdue(task)) return 1;
-    if (task.priority === "Urgent") return 2;
-    if (task.priority === "High") return 3;
-    if (isDueToday(task)) return 4;
-    return 5;
-  };
-
-  const scoreA = getScore(a);
-  const scoreB = getScore(b);
-
-  if (scoreA !== scoreB) {
-    return scoreA - scoreB;
-  }
-
-  const dateA = new Date(a.created_at || 0).getTime();
-  const dateB = new Date(b.created_at || 0).getTime();
-
-  return dateB - dateA;
-});
 return (
   <main
   style={{
@@ -704,7 +632,6 @@ color: textColor,
   </div>
 )}
 
-{currentEmployee?.role !== "Technician" && (
 <div
   style={{
     display: "grid",
@@ -770,7 +697,6 @@ color: textColor,
           <p style={numberStyle}>{employees.length}</p>
         </div>
       </div>
-      )}
       <div style={{ marginTop: "30px" }}>
   <h2>Department Overview</h2>
 
@@ -928,7 +854,7 @@ location: selectedStore?.location || "",
         </div>
         </TaskForm>
       )}
-{currentEmployee?.role !== "Technician" && (
+
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Filters / Reporting</h2>
         <div
@@ -940,7 +866,25 @@ location: selectedStore?.location || "",
     marginBottom: "10px",
   }}
 >
-
+{[...new Set(stores.map((s) => s.company_name))]
+  .filter(Boolean)
+  .map((company) => (
+      <div
+        key={company}
+        style={{
+          background: "#eef2ff",
+          padding: "10px 14px",
+          borderRadius: "10px",
+          fontSize: "14px",
+        }}
+      >
+        {company}:{" "}
+        {
+          tasks.filter((t) => t.stores?.company_name === company)
+            .length
+        }
+      </div>
+    ))}
 </div>
 <div
   style={{
@@ -998,25 +942,7 @@ location: selectedStore?.location || "",
             <option>Waiting Parts</option>
             <option>Completed</option>
           </select>
-          <select
-  value={storeFilter}
-  onChange={(e) => setStoreFilter(e.target.value)}
-  style={{
-    ...inputStyle,
-    width: "100%",
-    minWidth: "0",
-  }}
->
-  <option value="All">All stores</option>
 
-  {stores
-  .filter((store) => store.store_name && store.location)
-  .map((store) => (
-    <option key={store.id} value={store.id}>
-      {store.store_name} — {store.location}
-    </option>
-  ))}
-</select>
           <select
             value={employeeFilter}
             onChange={(e) => setEmployeeFilter(e.target.value)}
@@ -1042,7 +968,7 @@ location: selectedStore?.location || "",
     minWidth: "0",
   }}
 >
-<option value="All">All departments</option>
+<option>All</option>
 <option>General</option>
 <option>Systems</option>
 <option>Construction</option>
@@ -1055,7 +981,7 @@ location: selectedStore?.location || "",
 >
   <option value="All">All companies</option>
 
-  {[...new Set(stores.map((s) => s.company_name))]
+  {[...new Set(tasks.map((t) => t.stores?.company_name))]
     .filter(Boolean)
     .map((company) => (
       <option key={company} value={company}>
@@ -1064,7 +990,21 @@ location: selectedStore?.location || "",
     ))}
 </select>
 
+<select
+  value={locationFilter}
+  onChange={(e) => setLocationFilter(e.target.value)}
+  style={inputStyle}
+>
+  <option value="All">All locations</option>
 
+  {[...new Set(stores.map((s) => s.location))]
+  .filter(Boolean)
+  .map((location) => (
+      <option key={location} value={location}>
+        {location}
+      </option>
+    ))}
+</select>
 
 <input
   placeholder="Search store / issue / technician"
@@ -1106,7 +1046,7 @@ location: selectedStore?.location || "",
   </button>
 </div>
       </div>
-)}
+
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Service Tasks</h2>
   <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
@@ -1118,20 +1058,20 @@ location: selectedStore?.location || "",
     gap: "15px",
   }}
 >
-  {sortedTasks.map((task) => (
+  {filteredTasks.map((task) => (
     <TaskMobileCard
-    key={task.id}
-    task={task}
-    buttonStyle={buttonStyle}
-    setSelectedTask={setSelectedTask}
-    setSelectedTaskId={setSelectedTaskId}
-    loadComments={loadComments}
-    loadPhotos={loadPhotos}
-    setSelectedPhotoTaskId={setSelectedPhotoTaskId}
-    currentEmployee={currentEmployee}
-    highlightStyle={getTaskHighlightStyle(task)}
-    updateStatus={updateStatus}
-  />
+      key={task.id}
+      task={task}
+      buttonStyle={buttonStyle}
+      setSelectedTask={setSelectedTask}
+      setSelectedTaskId={setSelectedTaskId}
+      loadComments={loadComments}
+      loadPhotos={loadPhotos}
+      setSelectedPhotoTaskId={setSelectedPhotoTaskId}
+      highlightStyle={{}}
+updateStatus={updateStatus}
+currentEmployee={currentEmployee}
+    />
   ))}
 </div>
 )}
@@ -1163,16 +1103,19 @@ location: selectedStore?.location || "",
           </thead>
 
           <tbody>
-          {sortedTasks.map((task) => (
+          {filteredTasks.map((task) => (
   <tr
   key={task.id}
   style={{
-    ...getTaskHighlightStyle(task),
     background: darkMode
       ? "#1e293b"
       : task.status === "Completed"
       ? "#ecfdf5"
-      : getTaskHighlightStyle(task).background || "white",
+      : task.priority === "Urgent"
+      ? "#fee2e2"
+      : task.priority === "High"
+      ? "#fff7ed"
+      : "white",
     color: darkMode ? "#f8fafc" : "#111827",
   }}
 >
@@ -1191,79 +1134,9 @@ location: selectedStore?.location || "",
 
     <td style={tdStyle}>{task.issue}</td>
     <td style={tdStyle}>{task.category || "General"}</td>
-    <td style={{ ...tdStyle }}>
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      flexWrap: "wrap",
-    }}
-  >
-    <span
-  style={{
-    background:
-      task.priority === "Urgent"
-        ? "#dc2626"
-        : task.priority === "High"
-        ? "#f97316"
-        : task.priority === "Low"
-        ? "#16a34a"
-        : "#2563eb",
-    color: "white",
-    padding: "6px 10px",
-    borderRadius: "999px",
-    fontWeight: "bold",
-    fontSize: "12px",
-    display: "inline-block",
-    minWidth: "90px",
-    textAlign: "center",
-  }}
->
-  {task.priority || "Medium"}
-</span>
-
-    
-
-  
-
-    {task.due_date &&
-      new Date(task.due_date).toDateString() ===
-        new Date().toDateString() && (
-        <span
-          style={{
-            background: "#2563eb",
-            color: "white",
-            padding: "2px 8px",
-            borderRadius: "999px",
-            fontSize: "11px",
-            fontWeight: 600,
-          }}
-        >
-          TODAY
-        </span>
-      )}
-
-    {task.due_date &&
-      new Date(task.due_date) <
-        new Date(new Date().setHours(0, 0, 0, 0)) &&
-      task.status !== "Done" &&
-      task.status !== "Completed" && (
-        <span
-          style={{
-            background: "#991b1b",
-            color: "white",
-            padding: "2px 8px",
-            borderRadius: "999px",
-            fontSize: "11px",
-            fontWeight: 600,
-          }}
-        >
-          OVERDUE
-        </span>
-      )}
-  </div>
-</td>
+    <td style={{ ...tdStyle, color: getPriorityColor(task.priority || "Medium"), fontWeight: "bold" }}>
+      {task.priority || "Medium"}
+    </td>
     <td style={tdStyle}>{task.due_date || "-"}</td>
     <td style={tdStyle}>
       {task.employees?.full_name || task.technician || "Not assigned"}
@@ -1366,49 +1239,27 @@ location: selectedStore?.location || "",
     Edit
   </button>
 )}
-<button
-  onClick={() => {
-
-    const text = `
-🚨 NEW SERVICE TASK
-
-Store: ${task.stores?.store_name || task.store || ""}
-
-Department: ${task.category || ""}
-Issue: ${task.issue || ""}
-Priority: ${task.priority || ""}
-Status: ${task.status || ""}
-
-Technician: ${
-  task.technician ||
-  employees.find((employee) => employee.id === task.employee_id)?.full_name ||
-  "Not assigned"
-}
-
-Created by: ${task.created_by || currentEmployee?.full_name || "Retail Systems"}
-`;
-
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(text.trim())}`,
-      "_blank"
-    );
-  }}
+        <a
+  href={`https://wa.me/?text=${encodeURIComponent(
+    `Task: ${task.issue}
+Store: ${task.store}
+Status: ${task.status}`
+  )}`}
+  target="_blank"
   style={{
     background: "#25D366",
     color: "white",
     padding: "8px 14px",
     borderRadius: "8px",
-    border: "none",
-    cursor: "pointer",
+    textDecoration: "none",
     marginRight: "10px",
     display: "inline-block",
-    whiteSpace: "nowrap",
   }}
 >
-WhatsApp Message
-</button>
+  WhatsApp
+</a>
 
-<label
+      <label
   style={{
     background: "#16a34a",
     color: "white",
@@ -1417,7 +1268,7 @@ WhatsApp Message
     cursor: "pointer",
     marginRight: "10px",
     display: "inline-block",
-    whiteSpace: "nowrap",
+whiteSpace: "nowrap",
   }}
 >
   Upload Photo
@@ -1439,7 +1290,21 @@ WhatsApp Message
     }}
   />
 </label>
-        
+{currentEmployee?.role?.toLowerCase() === "admin" && (
+        <button
+          onClick={() => deleteTask(task.id)}
+          style={{
+            background: "#dc2626",
+            color: "white",
+            padding: "8px 14px",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+          }}
+        >
+          Delete
+        </button>
+      )}
     </td>
   </tr>
 ))}
