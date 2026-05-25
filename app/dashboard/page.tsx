@@ -930,7 +930,7 @@ location: selectedStore?.location || "",
       </div>
     ))}
 </div>
-{!isTechnician && (
+{false && (
 <div
   style={{
     display: "grid",
