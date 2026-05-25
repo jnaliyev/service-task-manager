@@ -58,6 +58,7 @@ const supabase = createClient(
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  
   const [isMobile, setIsMobile] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -74,6 +75,17 @@ const isManager = currentEmployee?.role === "Manager";
 const isTechnician = currentEmployee?.role === "Technician";
 const isInventory = currentEmployee?.role === "Inventory";
 const isViewer = currentEmployee?.role === "Viewer";
+const kpiTasks =
+  isAdmin
+    ? tasks
+    : isManager
+    ? tasks.filter((task) => task.department === currentEmployee?.department)
+    : tasks.filter((task) => task.employee_id === String(currentEmployee?.id));
+
+const totalKpiTasks = kpiTasks.length;
+const openKpiTasks = kpiTasks.filter((task) => task.status !== "Done").length;
+const doneKpiTasks = kpiTasks.filter((task) => task.status === "Done").length;
+const urgentKpiTasks = kpiTasks.filter((task) => task.priority === "Urgent").length;
 
 const canEdit =
   isAdmin || isManager || isTechnician || isInventory;
@@ -1080,6 +1092,82 @@ currentEmployee={currentEmployee}
 
   {!isMobile && (
   <TaskTable>
+  <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "16px",
+    marginBottom: "20px",
+  }}
+>
+  <div
+    style={{
+      background: "white",
+      padding: "20px",
+      borderRadius: "12px",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    }}
+  >
+    <div style={{ fontSize: "14px", color: "#6b7280" }}>
+      Total Tasks
+    </div>
+
+    <div style={{ fontSize: "32px", fontWeight: "bold" }}>
+      {totalKpiTasks}
+    </div>
+  </div>
+
+  <div
+    style={{
+      background: "white",
+      padding: "20px",
+      borderRadius: "12px",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    }}
+  >
+    <div style={{ fontSize: "14px", color: "#6b7280" }}>
+      Open Tasks
+    </div>
+
+    <div style={{ fontSize: "32px", fontWeight: "bold" }}>
+      {openKpiTasks}
+    </div>
+  </div>
+
+  <div
+    style={{
+      background: "white",
+      padding: "20px",
+      borderRadius: "12px",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    }}
+  >
+    <div style={{ fontSize: "14px", color: "#6b7280" }}>
+      Done Tasks
+    </div>
+
+    <div style={{ fontSize: "32px", fontWeight: "bold" }}>
+      {doneKpiTasks}
+    </div>
+  </div>
+
+  <div
+    style={{
+      background: "white",
+      padding: "20px",
+      borderRadius: "12px",
+      boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    }}
+  >
+    <div style={{ fontSize: "14px", color: "#6b7280" }}>
+      Urgent Tasks
+    </div>
+
+    <div style={{ fontSize: "32px", fontWeight: "bold" }}>
+      {urgentKpiTasks}
+    </div>
+  </div>
+</div>
     <table
       style={{
         width: "100%",
