@@ -87,6 +87,17 @@ const openKpiTasks = kpiTasks.filter((task) => task.status !== "Done").length;
 const doneKpiTasks = kpiTasks.filter((task) => task.status === "Done").length;
 const urgentKpiTasks = kpiTasks.filter((task) => task.priority === "Urgent").length;
 
+const visibleEmployees =
+  isAdmin
+    ? employees
+    : isManager
+    ? employees.filter(
+        (employee) => employee.department === currentEmployee?.department
+      )
+    : employees.filter(
+        (employee) => String(employee.id) === String(currentEmployee?.id)
+      );
+
 const canEdit =
   isAdmin || isManager || isTechnician || isInventory;
 
@@ -653,7 +664,7 @@ color: textColor,
         <h3 style={{ color: darkMode ? "#f9fafb" : "#111827" }}>
   Total Tasks
 </h3>
-  <p style={numberStyle}>{tasks.length}</p>
+<p style={numberStyle}>{totalKpiTasks}</p>
 </div>
 
 <div
@@ -715,10 +726,52 @@ color: textColor,
       <div key={department} style={cardStyle}>
         <h3>{department}</h3>
         <p style={numberStyle}>
-          {tasks.filter((task) => task.department === department || task.category === department).length}
-        </p>
+  {openKpiTasks}
+</p>
       </div>
     ))}
+  </div>
+</div>
+<div style={{ marginTop: "20px" }}>
+  <h3
+    style={{
+      marginBottom: "15px",
+      color: darkMode ? "#f9fafb" : "#111827",
+    }}
+  >
+    Employee KPI
+  </h3>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: "15px",
+    }}
+  >
+    {visibleEmployees.map((employee) => {
+      const employeeTasks = tasks.filter(
+        (task) => String(task.employee_id) === String(employee.id)
+      );
+
+      const completedTasks = employeeTasks.filter(
+        (task) => task.status === "Completed"
+      ).length;
+
+      return (
+        <div key={employee.id} style={cardStyle}>
+          <h3>{employee.full_name}</h3>
+
+          <p style={{ marginTop: "10px", fontSize: "14px" }}>
+            Total: {employeeTasks.length}
+          </p>
+
+          <p style={{ fontSize: "14px" }}>
+            Completed: {completedTasks}
+          </p>
+        </div>
+      );
+    })}
   </div>
 </div>
 
