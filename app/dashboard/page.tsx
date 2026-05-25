@@ -215,15 +215,7 @@ location: "",
     (isManager && task.department === currentEmployee?.department) ||
     (isTechnician && task.employee_id === String(currentEmployee?.id));
       
-      return (
-        roleAccess &&
-        matchStatus &&
-        matchEmployee &&
-        matchCategory &&
-        matchCompany &&
-        matchLocation &&
-        matchSearch
-      );
+    return roleAccess;
     });
   }, 
   [
@@ -867,6 +859,7 @@ location: selectedStore?.location || "",
         </TaskForm>
       )}
 
+{false && (
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Filters / Reporting</h2>
         <div
@@ -1060,7 +1053,7 @@ location: selectedStore?.location || "",
   </button>
 </div>
       </div>
-
+)}
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Service Tasks</h2>
   <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
