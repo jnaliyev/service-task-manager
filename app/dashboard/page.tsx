@@ -211,9 +211,9 @@ location: "",
   
     const roleAccess =
     isAdmin ||
-    isManager ||
-    (isTechnician && task.employee_id === currentEmployee?.id) ||
-    isViewer;
+    isViewer ||
+    (isManager && task.department === currentEmployee?.department) ||
+    (isTechnician && task.employee_id === String(currentEmployee?.id));
       
       return (
         roleAccess &&
@@ -930,6 +930,7 @@ location: selectedStore?.location || "",
       </div>
     ))}
 </div>
+{!isTechnician && (
 <div
   style={{
     display: "grid",
@@ -1026,6 +1027,7 @@ location: selectedStore?.location || "",
 />
     
         </div>
+        )}
 
         <div
   style={{
