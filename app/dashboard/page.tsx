@@ -1067,6 +1067,7 @@ location: selectedStore?.location || "",
       setSelectedTaskId={setSelectedTaskId}
       loadComments={loadComments}
       loadPhotos={loadPhotos}
+      uploadPhoto={uploadPhoto}
       setSelectedPhotoTaskId={setSelectedPhotoTaskId}
       highlightStyle={{}}
 updateStatus={updateStatus}

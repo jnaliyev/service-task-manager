@@ -9,6 +9,8 @@ type Props = {
   
     loadComments: (taskId: number) => void;
     loadPhotos: (taskId: number) => void;
+
+    uploadPhoto: (taskId: number, file: File) => Promise<void>;
   
     setSelectedPhotoTaskId: (id: number) => void;
     currentEmployee: any;
@@ -22,6 +24,7 @@ type Props = {
     setSelectedTaskId,
     loadComments,
     loadPhotos,
+    uploadPhoto,
     setSelectedPhotoTaskId,
     currentEmployee,
     updateStatus,
@@ -182,10 +185,7 @@ type Props = {
   Comments
 </button>
 
-<button
-  onClick={() => {
-    setSelectedPhotoTaskId(task.id);
-  }}
+<label
   style={{
     background: "#16a34a",
     color: "white",
@@ -194,10 +194,35 @@ type Props = {
     border: "none",
     cursor: "pointer",
     width: "100%",
+    display: "block",
+    textAlign: "center",
+    position: "relative",
+    overflow: "hidden",
   }}
 >
   Upload Photo
-</button>
+
+  <input
+    type="file"
+    accept="image/*"
+    style={{
+      position: "absolute",
+      left: 0,
+      top: 0,
+      width: "100%",
+      height: "100%",
+      opacity: 0,
+      cursor: "pointer",
+    }}
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+
+      if (!file) return;
+
+      uploadPhoto(task.id, file);
+    }}
+  />
+</label>
         
   
           <button
