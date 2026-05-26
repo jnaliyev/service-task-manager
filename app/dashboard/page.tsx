@@ -220,10 +220,11 @@ location: "",
     task.employees?.full_name?.toLowerCase().includes(search);
   
     const roleAccess =
-    isAdmin ||
-    isViewer ||
-    (isManager && task.department === currentEmployee?.department) ||
-    (isTechnician && task.employee_id === String(currentEmployee?.id));
+  isAdmin ||
+  isGeneral ||
+  isViewer ||
+  (isManager && task.department === currentEmployee?.department) ||
+  (isTechnician && task.employee_id === String(currentEmployee?.id));
       
     return roleAccess;
     });
