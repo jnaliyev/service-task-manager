@@ -1378,9 +1378,15 @@ currentEmployee={currentEmployee}
 )}
         <a
   href={`https://wa.me/?text=${encodeURIComponent(
-    `Task: ${task.issue}
+   `Task: ${task.issue}
+
 Store: ${task.store}
-Status: ${task.status}`
+
+Status: ${task.status}
+
+Assigned To: ${task.technician || "Not Assigned"}
+
+Created By: ${task.created_by || "Retail Systems"}`
   )}`}
   target="_blank"
   style={{
