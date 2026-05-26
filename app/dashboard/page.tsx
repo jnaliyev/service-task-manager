@@ -71,24 +71,24 @@ const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [stores, setStores] = useState<any[]>([]);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const isAdmin = currentEmployee?.role === "Admin";
+  const isGeneral = currentEmployee?.role === "General";
 const isManager = currentEmployee?.role === "Manager";
 const isTechnician = currentEmployee?.role === "Technician";
 const isInventory = currentEmployee?.role === "Inventory";
 const isViewer = currentEmployee?.role === "Viewer";
 const kpiTasks =
-  isAdmin
+  isAdmin || isGeneral
     ? tasks
     : isManager
     ? tasks.filter((task) => task.department === currentEmployee?.department)
     : tasks.filter((task) => task.employee_id === String(currentEmployee?.id));
-
 const totalKpiTasks = kpiTasks.length;
 const openKpiTasks = kpiTasks.filter((task) => task.status !== "Done").length;
 const doneKpiTasks = kpiTasks.filter((task) => task.status === "Done").length;
 const urgentKpiTasks = kpiTasks.filter((task) => task.priority === "Urgent").length;
 
 const visibleEmployees =
-  isAdmin
+  isAdmin || isGeneral
     ? employees
     : isManager
     ? employees.filter(
@@ -97,7 +97,6 @@ const visibleEmployees =
     : employees.filter(
         (employee) => String(employee.id) === String(currentEmployee?.id)
       );
-
 const canEdit =
   isAdmin || isManager || isTechnician || isInventory;
 
