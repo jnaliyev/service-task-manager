@@ -310,6 +310,7 @@ location: "",
       due_date: newTask.due_date || null,
       employee_id: newTask.employee_id || null,
       technician: selectedEmployee?.full_name || "",
+      created_by: currentEmployee?.full_name || "Retail Systems",
     };
 
     const { error } = editingTask
