@@ -942,7 +942,7 @@ location: selectedStore?.location || "",
               style={inputStyle}
             >
               <option value="">Select employee</option>
-              {employees.map((employee) => (
+              {visibleEmployees.map((employee) => (
                 <option key={employee.id} value={employee.id}>
                   {employee.full_name} ({employee.role})
                 </option>
@@ -1014,25 +1014,7 @@ location: selectedStore?.location || "",
     marginBottom: "10px",
   }}
 >
-{[...new Set(stores.map((s) => s.company_name))]
-  .filter(Boolean)
-  .map((company) => (
-      <div
-        key={company}
-        style={{
-          background: "#eef2ff",
-          padding: "10px 14px",
-          borderRadius: "10px",
-          fontSize: "14px",
-        }}
-      >
-        {company}:{" "}
-        {
-          tasks.filter((t) => t.stores?.company_name === company)
-            .length
-        }
-      </div>
-    ))}
+
 </div>
 <div
   style={{
