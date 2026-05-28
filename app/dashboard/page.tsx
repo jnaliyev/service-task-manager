@@ -1002,7 +1002,7 @@ location: selectedStore?.location || "",
         </TaskForm>
       )}
 
-{false && (
+{(isAdmin || isGeneral || isManager) && (
       <div style={{ ...panelStyle, marginTop: "30px" }}>
         <h2>Filters / Reporting</h2>
         <div
