@@ -783,11 +783,40 @@ color: textColor,
             border: urgentTasks > 0 ? "2px solid #dc2626" : "1px solid #e5e7eb",
           }}
         >
-          <h3 style={{ marginBottom: "6px" }}>{employee.full_name}</h3>
+          <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "14px",
+  }}
+>
+  <h3
+    style={{
+      margin: 0,
+      fontSize: "18px",
+      fontWeight: "700",
+      color: darkMode ? "#f8fafc" : "#111827",
+    }}
+  >
+    {employee.full_name}
+  </h3>
 
-          <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px" }}>
-            {employee.department || "No department"}
-          </p>
+  <div
+    style={{
+      background: darkMode ? "#334155" : "#eef2ff",
+      color: darkMode ? "#cbd5e1" : "#4338ca",
+      padding: "4px 10px",
+      borderRadius: "999px",
+      fontSize: "12px",
+      fontWeight: "600",
+    }}
+  >
+    {employee.department || "General"}
+  </div>
+</div>
+
+          
 
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span>Total</span>
