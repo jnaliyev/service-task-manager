@@ -733,7 +733,7 @@ color: textColor,
     ))}
   </div>
 </div>
-<div style={{ marginTop: "20px" }}>
+<div style={{ marginTop: "25px" }}>
   <h3
     style={{
       marginBottom: "15px",
@@ -746,8 +746,8 @@ color: textColor,
   <div
     style={{
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-      gap: "15px",
+      gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+      gap: "16px",
     }}
   >
     {visibleEmployees.map((employee) => {
@@ -759,16 +759,76 @@ color: textColor,
         (task) => task.status === "Completed"
       ).length;
 
-      return (
-        <div key={employee.id} style={cardStyle}>
-          <h3>{employee.full_name}</h3>
+      const openTasks = employeeTasks.filter(
+        (task) => task.status !== "Completed"
+      ).length;
 
-          <p style={{ marginTop: "10px", fontSize: "14px" }}>
-            Total: {employeeTasks.length}
+      const urgentTasks = employeeTasks.filter(
+        (task) => task.priority === "Urgent"
+      ).length;
+
+      const completionRate =
+        employeeTasks.length > 0
+          ? Math.round((completedTasks / employeeTasks.length) * 100)
+          : 0;
+
+      return (
+        <div
+          key={employee.id}
+          style={{
+            background: darkMode ? "#1e293b" : "white",
+            borderRadius: "16px",
+            padding: "18px",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+            border: urgentTasks > 0 ? "2px solid #dc2626" : "1px solid #e5e7eb",
+          }}
+        >
+          <h3 style={{ marginBottom: "6px" }}>{employee.full_name}</h3>
+
+          <p style={{ fontSize: "13px", color: "#6b7280", marginBottom: "14px" }}>
+            {employee.department || "No department"}
           </p>
 
-          <p style={{ fontSize: "14px" }}>
-            Completed: {completedTasks}
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>Total</span>
+            <strong>{employeeTasks.length}</strong>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>Open</span>
+            <strong>{openTasks}</strong>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>Completed</span>
+            <strong>{completedTasks}</strong>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>Urgent</span>
+            <strong>{urgentTasks}</strong>
+          </div>
+
+          <div
+            style={{
+              marginTop: "14px",
+              height: "8px",
+              background: "#e5e7eb",
+              borderRadius: "999px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${completionRate}%`,
+                height: "100%",
+                background: completionRate >= 70 ? "#16a34a" : "#f59e0b",
+              }}
+            />
+          </div>
+
+          <p style={{ marginTop: "8px", fontSize: "13px", color: "#6b7280" }}>
+            Completion: {completionRate}%
           </p>
         </div>
       );
