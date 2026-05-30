@@ -100,8 +100,8 @@ const visibleEmployees =
 const canEdit =
   isAdmin || isManager || isTechnician || isInventory;
 
-const canCreateTask =
-  isAdmin || isManager;
+  const canCreateTask =
+  isAdmin || isGeneral || isManager;
 
 const canManageEmployees =
   isAdmin;
