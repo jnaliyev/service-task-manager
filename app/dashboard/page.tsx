@@ -552,15 +552,39 @@ async function uploadPhoto(taskId: number, file: File) {
 }
 return (
   <main
-  style={{
-    padding: "40px",
-    fontFamily: "Arial",
-    background: bgColor,
-color: textColor,
-    minHeight: "100vh",
-    transition: "0.3s",
-  }}
->
+    style={{
+      padding: "40px",
+      fontFamily: "Arial",
+      background: bgColor,
+      color: textColor,
+      minHeight: "100vh",
+      transition: "0.3s",
+    }}
+  >
+    <div
+      style={{
+        marginBottom: 20,
+        display: "flex",
+        gap: 12,
+        flexWrap: "wrap",
+      }}
+    >
+      <a
+        href="/dashboard/inventory"
+        style={{
+          background: "#111827",
+          color: "white",
+          padding: "12px 18px",
+          borderRadius: 10,
+          textDecoration: "none",
+          fontWeight: 700,
+          display: "inline-block",
+        }}
+      >
+        📦 Inventory Projects
+      </a>
+    </div>
+
 <div style={{ marginBottom: "20px" }}>
   <button
     onClick={() => setDarkMode(!darkMode)}
