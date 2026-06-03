@@ -70,6 +70,21 @@ export default function InventoryPage() {
 
   return (
     <div style={{ padding: 24 }}>
+    <a
+  href="/dashboard"
+  style={{
+    background: "#f3f4f6",
+    color: "#111827",
+    padding: "10px 16px",
+    borderRadius: "10px",
+    textDecoration: "none",
+    display: "inline-block",
+    marginBottom: "20px",
+    fontWeight: "600",
+  }}
+>
+  ← Dashboard
+</a>
       <h1
         style={{
           fontSize: 32,
