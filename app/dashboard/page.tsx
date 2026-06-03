@@ -1454,7 +1454,7 @@ currentEmployee={currentEmployee}
       >
         Comments
         </button>
-        {(isAdmin || isManager) && (
+        {(isAdmin || isGeneral || isManager) && (
   <button
     onClick={() => {
       setEditingTask(task);
