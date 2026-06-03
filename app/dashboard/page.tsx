@@ -808,9 +808,14 @@ return (
 
       return (
         <div
-          key={employee.id}
-          style={{
-            background: darkMode ? "#1e293b" : "white",
+  key={employee.id}
+  onClick={() => {
+    setEmployeeFilter(String(employee.id));
+    setCurrentPage(1);
+  }}
+  style={{
+    background: darkMode ? "#1e293b" : "white",
+    cursor: "pointer",
             borderRadius: "16px",
             padding: "18px",
             boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
