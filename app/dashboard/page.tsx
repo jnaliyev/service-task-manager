@@ -228,7 +228,7 @@ location: "",
   (isManager && task.department === currentEmployee?.department) ||
   (isTechnician && task.employee_id === String(currentEmployee?.id));
       
-    return roleAccess;
+  return roleAccess && matchEmployee;
     });
   }, 
   [
