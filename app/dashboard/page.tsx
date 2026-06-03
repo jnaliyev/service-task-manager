@@ -21,6 +21,8 @@ type Task = {
   store: string;
   issue: string;
  technician: string;
+ company_name?: string;
+location?: string;
   status: string;
   category?: string;
   department?: string;
@@ -67,6 +69,7 @@ const [commentText, setCommentText] = useState("");
 const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 const [editingTask, setEditingTask] = useState<Task | null>(null);
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
@@ -106,7 +109,7 @@ const visibleEmployees =
 const canManageEmployees =
   isAdmin;
   const [showForm, setShowForm] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const darkMode = false;
   const bgColor = darkMode ? "#020817" : "#f3f4f6";
 const panelBg = darkMode ? "#1e293b" : "white";
 const textColor = darkMode ? "#f8fafc" : "#111827";
@@ -121,6 +124,13 @@ const tasksPerPage = 10;
   const [searchText, setSearchText] = useState("");
   const [companyFilter, setCompanyFilter] = useState("All");
 const [locationFilter, setLocationFilter] = useState("All");
+const [reportType, setReportType] = useState("detailed");
+const [showReportPreview, setShowReportPreview] = useState(true);
+
+const [showEmployeeKpi, setShowEmployeeKpi] = useState(false);
+const [showDepartmentKpi, setShowDepartmentKpi] = useState(false);
+const [showServiceKpi, setShowServiceKpi] = useState(false);
+const [showReports, setShowReports] = useState(true);
   const [storeSearchText, setStoreSearchText] = useState("");
   const [newTask, setNewTask] = useState({
     store_id: "",
@@ -228,7 +238,15 @@ location: "",
   (isManager && task.department === currentEmployee?.department) ||
   (isTechnician && task.employee_id === String(currentEmployee?.id));
       
-  return roleAccess && matchEmployee;
+  return (
+    roleAccess &&
+    matchStatus &&
+    matchEmployee &&
+    matchCategory &&
+    matchCompany &&
+    matchLocation &&
+    matchSearch
+  );
     });
   }, 
   [
@@ -240,6 +258,25 @@ location: "",
     locationFilter,
     searchText,
   ]);
+
+  const reportingOpenTasks = filteredTasks.filter(
+    (task) => task.status !== "Completed"
+  ).length;
+  
+  const reportingCompletedTasks = filteredTasks.filter(
+    (task) => task.status === "Completed"
+  ).length;
+  
+  const reportingUrgentTasks = filteredTasks.filter(
+    (task) => task.priority === "Urgent"
+  ).length;
+  
+  const reportingOverdueTasks = filteredTasks.filter(
+    (task) =>
+      task.due_date &&
+      task.status !== "Completed" &&
+      new Date(task.due_date) < new Date()
+  ).length;
 
   const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
 
@@ -416,34 +453,125 @@ const paginatedTasks = filteredTasks.slice(
     loadTasks();
   }
   function exportTasks() {
-    const headers = [
-      "Store",
-      "Company",
-      "Location",
-      "Issue",
-      "Category",
-      "Priority",
-      "Assigned To",
-      "Status",
-      "Due Date",
-    ];
+    let headers: string[] = [];
+    let rows: any[] = [];
   
-    const rows = filteredTasks.map((task) => [
-      task.store,
-      task.stores?.company_name || "",
-task.stores?.location || "",
-      task.issue,
-      task.category,
-      task.priority,
-      task.technician,
-      task.status,
-      task.due_date,
-    ]);
+    if (reportType === "detailed") {
+      headers = [
+        "Store",
+        "Company",
+        "Location",
+        "Issue",
+        "Category",
+        "Priority",
+        "Assigned To",
+        "Status",
+        "Due Date",
+      ];
   
-    const csvContent =
-      [headers, ...rows]
-        .map((e) => e.join(","))
-        .join("\n");
+      rows = filteredTasks.map((task) => [
+        task.store,
+        task.stores?.company_name || "",
+        task.stores?.location || "",
+        task.issue,
+        task.category,
+        task.priority,
+        task.technician,
+        task.status,
+        task.due_date,
+      ]);
+    }
+  
+    if (reportType === "store") {
+      headers = ["Store", "Total Tasks", "Open", "Completed"];
+  
+      const grouped = [...new Set(filteredTasks.map((t) => t.store))];
+  
+      rows = grouped.map((store) => {
+        const storeTasks = filteredTasks.filter(
+          (t) => t.store === store
+        );
+  
+        return [
+          store,
+          storeTasks.length,
+          storeTasks.filter((t) => t.status !== "Completed").length,
+          storeTasks.filter((t) => t.status === "Completed").length,
+        ];
+      });
+    }
+  
+    if (reportType === "company") {
+      headers = ["Company", "Total Tasks", "Open", "Completed"];
+    
+      const grouped = [
+        ...new Set(
+          filteredTasks.map(
+            (t) => t.stores?.company_name || t.company_name
+          )
+        ),
+      ].filter(Boolean);
+    
+      rows = grouped.map((company) => {
+        const companyTasks = filteredTasks.filter(
+          (t) =>
+            (t.stores?.company_name || t.company_name) === company
+        );
+    
+        return [
+          company,
+          companyTasks.length,
+          companyTasks.filter((t) => t.status !== "Completed").length,
+          companyTasks.filter((t) => t.status === "Completed").length,
+        ];
+      });
+    }
+  
+    if (reportType === "department") {
+      headers = ["Department", "Total Tasks", "Open", "Completed"];
+  
+      const grouped = [
+        ...new Set(filteredTasks.map((t) => t.department)),
+      ].filter(Boolean);
+  
+      rows = grouped.map((department) => {
+        const departmentTasks = filteredTasks.filter(
+          (t) => t.department === department
+        );
+  
+        return [
+          department,
+          departmentTasks.length,
+          departmentTasks.filter((t) => t.status !== "Completed").length,
+          departmentTasks.filter((t) => t.status === "Completed").length,
+        ];
+      });
+    }
+  
+    if (reportType === "employee") {
+      headers = ["Employee", "Total Tasks", "Open", "Completed"];
+  
+      const grouped = [
+        ...new Set(filteredTasks.map((t) => t.technician)),
+      ].filter(Boolean);
+  
+      rows = grouped.map((employee) => {
+        const employeeTasks = filteredTasks.filter(
+          (t) => t.technician === employee
+        );
+  
+        return [
+          employee,
+          employeeTasks.length,
+          employeeTasks.filter((t) => t.status !== "Completed").length,
+          employeeTasks.filter((t) => t.status === "Completed").length,
+        ];
+      });
+    }
+  
+    const csvContent = [headers, ...rows]
+      .map((row) => row.join(","))
+      .join("\n");
   
     const blob = new Blob([csvContent], {
       type: "text/csv;charset=utf-8;",
@@ -455,7 +583,7 @@ task.stores?.location || "",
   
     link.setAttribute(
       "download",
-      `tasks-report-${Date.now()}.csv`
+      `${reportType}-report-${Date.now()}.csv`
     );
   
     document.body.appendChild(link);
@@ -595,22 +723,7 @@ return (
       </a>
     </div>
 
-<div style={{ marginBottom: "20px" }}>
-  <button
-    onClick={() => setDarkMode(!darkMode)}
-    style={{
-      background: darkMode ? "#334155" : "#111827",
-      color: "white",
-      border: "none",
-      padding: "10px 18px",
-      borderRadius: "10px",
-      cursor: "pointer",
-      fontWeight: "bold",
-    }}
-  >
-    {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
-  </button>
-</div>
+
       <div
   style={{
     display: "flex",
@@ -747,35 +860,146 @@ return (
           <p style={numberStyle}>{employees.length}</p>
         </div>
       </div>
-      <div style={{ marginTop: "30px" }}>
-  <h2>Department Overview</h2>
-
-  <div
+      <div
   style={{
-    display: "grid",
-    gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
-    gap: "15px",
+    ...panelStyle,
+    marginTop: "30px",
+    padding: "22px",
   }}
->  
-    {["General", "Construction", "Systems", "Inventory"].map((department) => (
-      <div key={department} style={cardStyle}>
-        <h3>{department}</h3>
-        <p style={numberStyle}>
-  {openKpiTasks}
-</p>
-      </div>
-    ))}
-  </div>
-</div>
-<div style={{ marginTop: "25px" }}>
-  <h3
+>
+  <div
+    onClick={() => setShowDepartmentKpi(!showDepartmentKpi)}
     style={{
-      marginBottom: "15px",
-      color: darkMode ? "#f9fafb" : "#111827",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      cursor: "pointer",
+      marginBottom: "18px",
+      padding: "14px 18px",
+      background: darkMode ? "#0f172a" : "#f8fafc",
+      border: darkMode
+        ? "1px solid #334155"
+        : "1px solid #e2e8f0",
+      borderRadius: "12px",
+      borderBottom: showDepartmentKpi
+        ? "3px solid #2563eb"
+        : darkMode
+        ? "1px solid #334155"
+        : "1px solid #e2e8f0",
     }}
   >
-    Employee KPI
-  </h3>
+    <h2 style={{ margin: 0 }}>Department KPI</h2>
+
+    <div
+      style={{
+        background: darkMode ? "#1e293b" : "#dbeafe",
+        color: darkMode ? "#bfdbfe" : "#1d4ed8",
+        padding: "6px 10px",
+        borderRadius: "999px",
+        fontSize: "12px",
+        fontWeight: "700",
+      }}
+    >
+      {showDepartmentKpi ? "HIDE" : "SHOW"}
+    </div>
+  </div>
+
+  {showDepartmentKpi && (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+      gap: "15px",
+    }}
+  >
+    {["General", "Construction", "Systems", "Inventory"].map((department) => {
+  const departmentTasks = kpiTasks.filter(
+    (task) => task.department === department
+  );
+
+  const departmentOpenTasks = departmentTasks.filter(
+    (task) => task.status !== "Completed"
+  ).length;
+
+  return (
+    <div
+  key={department}
+  onClick={() => {
+    if (categoryFilter === department) {
+      setCategoryFilter("All");
+    } else {
+      setCategoryFilter(department);
+    }
+
+    setCurrentPage(1);
+  }}
+  style={{
+    ...cardStyle,
+    cursor: "pointer",
+    border:
+      categoryFilter === department
+        ? "2px solid #2563eb"
+        : "1px solid #e5e7eb",
+    transform:
+      categoryFilter === department
+        ? "scale(1.03)"
+        : "scale(1)",
+    transition: "all 0.2s ease",
+  }}
+>
+      <h3>{department}</h3>
+      <p style={numberStyle}>{departmentOpenTasks}</p>
+    </div>
+  );
+})}
+  </div>
+)}
+</div>
+<div
+  style={{
+    ...panelStyle,
+    marginTop: "25px",
+    padding: "22px",
+  }}
+>
+<div
+  onClick={() => setShowEmployeeKpi(!showEmployeeKpi)}
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+    marginBottom: "18px",
+    padding: "14px 18px",
+    background: darkMode ? "#0f172a" : "#f8fafc",
+    border: darkMode
+      ? "1px solid #334155"
+      : "1px solid #e2e8f0",
+    borderRadius: "12px",
+    borderBottom: showEmployeeKpi
+      ? "3px solid #2563eb"
+      : darkMode
+      ? "1px solid #334155"
+      : "1px solid #e2e8f0",
+    transition: "0.2s ease",
+  }}
+>
+  <h3 style={{ margin: 0 }}>Employee KPI</h3>
+  <div
+  style={{
+    background: darkMode ? "#1e293b" : "#dbeafe",
+    color: darkMode ? "#bfdbfe" : "#1d4ed8",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    fontSize: "12px",
+    fontWeight: "700",
+  }}
+>
+  {showEmployeeKpi ? "HIDE" : "SHOW"}
+</div>
+</div>
+
+{showEmployeeKpi && (
 
   <div
     style={{
@@ -810,7 +1034,12 @@ return (
         <div
   key={employee.id}
   onClick={() => {
-    setEmployeeFilter(String(employee.id));
+    if (employeeFilter === String(employee.id)) {
+      setEmployeeFilter("All");
+    } else {
+      setEmployeeFilter(String(employee.id));
+    }
+  
     setCurrentPage(1);
   }}
   style={{
@@ -819,7 +1048,19 @@ return (
             borderRadius: "16px",
             padding: "18px",
             boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
-            border: urgentTasks > 0 ? "2px solid #dc2626" : "1px solid #e5e7eb",
+            border:
+  employeeFilter === String(employee.id)
+    ? "2px solid #2563eb"
+    : urgentTasks > 0
+    ? "2px solid #dc2626"
+    : "1px solid #e5e7eb",
+
+transform:
+  employeeFilter === String(employee.id)
+    ? "scale(1.02)"
+    : "scale(1)",
+
+transition: "all 0.2s ease",
           }}
         >
           <div
@@ -902,6 +1143,7 @@ return (
       );
     })}
   </div>
+  )}
 </div>
 
       {currentEmployee?.role?.toLowerCase() !== "technician" && (
@@ -1060,38 +1302,7 @@ location: selectedStore?.location || "",
 >
 
 </div>
-<div
-  style={{
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-    marginTop: "10px",
-  }}
->
-  {[...new Set(tasks.map((t) => t.technician))]
-    .filter(Boolean)
-    .map((technician) => (
-      <div
-        key={technician}
-        style={{
-          background: darkMode ? "#334155" : "#ecfeff",
-          color: darkMode ? "#f8fafc" : "#111827",
-          padding: "10px 14px",
-          borderRadius: "10px",
-          fontSize: "14px",
-        }}
-      >
-        {technician}:{" "}
-        {
-          tasks.filter(
-            (t) =>
-              t.technician === technician &&
-              t.status !== "Completed"
-          ).length
-        }
-      </div>
-    ))}
-</div>
+
 {false && (
 <div
   style={{
@@ -1191,6 +1402,410 @@ location: selectedStore?.location || "",
         </div>
         )}
 
+<div
+  style={{
+    display: "grid",
+    gridTemplateColumns: isMobile
+      ? "1fr 1fr"
+      : "repeat(4, minmax(140px, 1fr))",
+    gap: "12px",
+    marginTop: "20px",
+  }}
+>
+<div
+  style={{
+    background: darkMode ? "#1e293b" : "white",
+    color: darkMode ? "#f8fafc" : "#111827",
+    padding: "16px",
+    borderRadius: "14px",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+  }}
+>
+  <span>Open</span>
+  <strong>{reportingOpenTasks}</strong>
+</div>
+
+<div
+  style={{
+    background: darkMode ? "#1e293b" : "white",
+    color: darkMode ? "#f8fafc" : "#111827",
+    padding: "16px",
+    borderRadius: "14px",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+  }}
+>
+  <span>Completed</span>
+  <strong>{reportingCompletedTasks}</strong>
+</div>
+
+<div
+  style={{
+    background: darkMode ? "#1e293b" : "white",
+    color: darkMode ? "#f8fafc" : "#111827",
+    padding: "16px",
+    borderRadius: "14px",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+  }}
+>
+  <span>Urgent</span>
+  <strong>{reportingUrgentTasks}</strong>
+</div>
+
+<div
+  style={{
+    background: darkMode ? "#1e293b" : "white",
+    color: darkMode ? "#f8fafc" : "#111827",
+    padding: "16px",
+    borderRadius: "14px",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    fontSize: "14px",
+    fontWeight: "600",
+  }}
+>
+  <span>Overdue</span>
+  <strong>{reportingOverdueTasks}</strong>
+</div>
+</div>
+
+{reportType === "department" && (
+  <div
+    style={{
+      ...panelStyle,
+      marginTop: "15px",
+      padding: "16px",
+      overflowX: "auto",
+    }}
+  >
+    <h3 style={{ marginTop: 0 }}>
+      Department Report Preview
+    </h3>
+
+    <table
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+      }}
+    >
+      <thead>
+        <tr>
+          <th style={{ textAlign: "left", padding: "10px" }}>
+            Department
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Total
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Open
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Completed
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {["General", "Construction", "Systems", "Inventory"].map(
+          (department) => {
+            const departmentTasks = filteredTasks.filter(
+              (task) => task.department === department
+            );
+
+            return (
+              <tr key={department}>
+                <td style={{ padding: "10px" }}>
+                  {department}
+                </td>
+
+                <td
+                  style={{
+                    padding: "10px",
+                    textAlign: "center",
+                  }}
+                >
+                  {departmentTasks.length}
+                </td>
+
+                <td
+                  style={{
+                    padding: "10px",
+                    textAlign: "center",
+                  }}
+                >
+                  {
+                    departmentTasks.filter(
+                      (task) =>
+                        task.status !== "Completed"
+                    ).length
+                  }
+                </td>
+
+                <td
+                  style={{
+                    padding: "10px",
+                    textAlign: "center",
+                  }}
+                >
+                  {
+                    departmentTasks.filter(
+                      (task) =>
+                        task.status === "Completed"
+                    ).length
+                  }
+                </td>
+              </tr>
+            );
+          }
+        )}
+      </tbody>
+    </table>
+  </div>
+)}
+{reportType === "employee" && (
+  <div
+    style={{
+      ...panelStyle,
+      marginTop: "15px",
+      padding: "16px",
+      overflowX: "auto",
+    }}
+  >
+    <h3 style={{ marginTop: 0 }}>
+      Employee Report Preview
+    </h3>
+
+    <table
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+      }}
+    >
+      <thead>
+        <tr>
+          <th style={{ textAlign: "left", padding: "10px" }}>
+            Employee
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Total
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Open
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Completed
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {[
+          ...new Set(
+            filteredTasks
+              .map((task) => task.technician)
+              .filter(Boolean)
+          ),
+        ].map((employee) => {
+          const employeeTasks = filteredTasks.filter(
+            (task) => task.technician === employee
+          );
+
+          return (
+            <tr key={employee}>
+              <td style={{ padding: "10px" }}>
+                {employee}
+              </td>
+
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {employeeTasks.length}
+              </td>
+
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {
+                  employeeTasks.filter(
+                    (task) => task.status !== "Completed"
+                  ).length
+                }
+              </td>
+
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {
+                  employeeTasks.filter(
+                    (task) => task.status === "Completed"
+                  ).length
+                }
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+)}
+{reportType === "company" && (
+  <div
+    style={{
+      ...panelStyle,
+      marginTop: "15px",
+      padding: "16px",
+      overflowX: "auto",
+    }}
+  >
+    <h3 style={{ marginTop: 0 }}>
+      Company Report Preview
+    </h3>
+
+    <table
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+      }}
+    >
+      <thead>
+        <tr>
+          <th style={{ textAlign: "left", padding: "10px" }}>
+            Company
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Total
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Open
+          </th>
+          <th style={{ textAlign: "center", padding: "10px" }}>
+            Completed
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {[
+          ...new Set(
+            filteredTasks
+              .map(
+                (task) =>
+                  task.stores?.company_name ||
+                  task.company_name
+              )
+              .filter(Boolean)
+          ),
+        ].map((company) => {
+          const companyTasks = filteredTasks.filter(
+            (task) =>
+              (task.stores?.company_name ||
+                task.company_name) === company
+          );
+
+          return (
+            <tr key={company}>
+              <td style={{ padding: "10px" }}>
+                {company}
+              </td>
+
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {companyTasks.length}
+              </td>
+
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {
+                  companyTasks.filter(
+                    (task) =>
+                      task.status !== "Completed"
+                  ).length
+                }
+              </td>
+
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {
+                  companyTasks.filter(
+                    (task) =>
+                      task.status === "Completed"
+                  ).length
+                }
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+)}
+{reportType === "store" && (
+  <div
+    style={{
+      ...panelStyle,
+      marginTop: "15px",
+      padding: "16px",
+      overflowX: "auto",
+    }}
+  >
+    <h3 style={{ marginTop: 0 }}>Store Report Preview</h3>
+
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <thead>
+        <tr>
+          <th style={{ textAlign: "left", padding: "10px" }}>Store</th>
+          <th style={{ textAlign: "center", padding: "10px" }}>Total</th>
+          <th style={{ textAlign: "center", padding: "10px" }}>Open</th>
+          <th style={{ textAlign: "center", padding: "10px" }}>Completed</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {[
+          ...new Set(
+            filteredTasks
+              .map(
+                (task) =>
+                  task.stores
+                    ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
+                    : task.store
+              )
+              .filter(Boolean)
+          ),
+        ].map((store) => {
+          const storeTasks = filteredTasks.filter((task) => {
+            const taskStore = task.stores
+              ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
+              : task.store;
+
+            return taskStore === store;
+          });
+
+          return (
+            <tr key={store}>
+              <td style={{ padding: "10px" }}>{store}</td>
+              <td style={{ padding: "10px", textAlign: "center" }}>{storeTasks.length}</td>
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {storeTasks.filter((task) => task.status !== "Completed").length}
+              </td>
+              <td style={{ padding: "10px", textAlign: "center" }}>
+                {storeTasks.filter((task) => task.status === "Completed").length}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+)}
+
         <div
   style={{
     display: "flex",
@@ -1211,15 +1826,77 @@ location: selectedStore?.location || "",
     Showing {filteredTasks.length} of {tasks.length} tasks
   </span>
 
+  {employeeFilter !== "All" && (
+  <div
+    style={{
+      background: darkMode ? "#1e3a8a" : "#dbeafe",
+      color: darkMode ? "#bfdbfe" : "#1d4ed8",
+      padding: "6px 12px",
+      borderRadius: "999px",
+      fontSize: "13px",
+      fontWeight: "600",
+    }}
+  >
+    Active filter:{" "}
+    {
+      employees.find(
+        (employee) =>
+          String(employee.id) === String(employeeFilter)
+      )?.full_name
+    }
+  </div>
+)}
+
+  <button
+  onClick={() => {
+    setStatusFilter("All");
+    setEmployeeFilter("All");
+    setCategoryFilter("All");
+    setCompanyFilter("All");
+    setLocationFilter("All");
+    setSearchText("");
+    setCurrentPage(1);
+  }}
+  style={{
+    ...buttonStyle,
+    background: "#f3f4f6",
+    color: "#111827",
+  }}
+>
+  Clear filters
+</button>
+
+<div
+  style={{
+    display: "flex",
+    gap: "12px",
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginTop: "10px",
+  }}
+>
+  <select
+    value={reportType}
+    onChange={(e) => setReportType(e.target.value)}
+    style={{
+      ...inputStyle,
+      width: isMobile ? "100%" : "240px",
+    }}
+  >
+    <option value="detailed">Detailed Tasks</option>
+    <option value="store">By Store</option>
+    <option value="company">By Company</option>
+    <option value="department">By Department</option>
+    <option value="employee">By Employee</option>
+  </select>
+
   <button
     onClick={exportTasks}
-    style={{
-      ...buttonStyle,
-      width: "100%",
-    }}
+    style={buttonStyle}
   >
     Export CSV
   </button>
+</div>
 </div>
       </div>
 )}
@@ -1756,6 +2433,8 @@ const buttonStyle = {
   fontSize: "16px",
   cursor: "pointer",
 };
+
+
 
 function getStatusColor(status: string) {
   if (status === "Completed") return "green";
