@@ -963,12 +963,17 @@ location: selectedStore?.location || "",
 })}
 </select>
 
-            <input
-              placeholder="Issue / Work Description"
-              value={newTask.issue}
-              onChange={(e) => setNewTask({ ...newTask, issue: e.target.value })}
-              style={inputStyle}
-            />
+<textarea
+  placeholder="Issue / Work Description"
+  value={newTask.issue}
+  onChange={(e) => setNewTask({ ...newTask, issue: e.target.value })}
+  style={{
+    ...inputStyle,
+    minHeight: "120px",
+    resize: "vertical",
+    lineHeight: "1.5",
+  }}
+/>
 
             <select
               value={newTask.employee_id}
