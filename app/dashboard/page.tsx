@@ -113,6 +113,8 @@ const textColor = darkMode ? "#f8fafc" : "#111827";
 const inputBg = darkMode ? "#334155" : "white";
 const borderColor = darkMode ? "#475569" : "#d1d5db";
   const [statusFilter, setStatusFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+const tasksPerPage = 10;
   const [employeeFilter, setEmployeeFilter] = useState("All");
 
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -238,6 +240,14 @@ location: "",
     locationFilter,
     searchText,
   ]);
+
+  const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
+
+const paginatedTasks = filteredTasks.slice(
+  (currentPage - 1) * tasksPerPage,
+  currentPage * tasksPerPage
+);
+
   async function loadEmployees() {
     const { data, error } = await supabase
       .from("employees")
@@ -1214,7 +1224,7 @@ location: selectedStore?.location || "",
     gap: "15px",
   }}
 >
-  {filteredTasks.map((task) => (
+{paginatedTasks.map((task) => (
     <TaskMobileCard
       key={task.id}
       task={task}
@@ -1336,7 +1346,7 @@ currentEmployee={currentEmployee}
           </thead>
 
           <tbody>
-          {filteredTasks.map((task) => (
+          {paginatedTasks.map((task) => (
   <tr
   key={task.id}
   style={{
@@ -1551,7 +1561,38 @@ whiteSpace: "nowrap",
 </table>
 </TaskTable>
 )}
-</div>  
+
+<div
+  style={{
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "10px",
+    marginTop: "20px",
+  }}
+>
+  <button
+    disabled={currentPage === 1}
+    onClick={() => setCurrentPage((prev) => prev - 1)}
+    style={buttonStyle}
+  >
+    Previous
+  </button>
+
+  <span>
+    Page {currentPage} of {totalPages}
+  </span>
+
+  <button
+    disabled={currentPage === totalPages}
+    onClick={() => setCurrentPage((prev) => prev + 1)}
+    style={buttonStyle}
+  >
+    Next
+  </button>
+</div>
+
+</div>
 
 {selectedTaskId && (
   <div>
