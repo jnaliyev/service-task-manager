@@ -33,6 +33,13 @@ created_by?: string;
   employee_id?: string;
   created_at?: string;
   employees?: Employee;
+  task_assignments?: {
+    employee_id: string;
+    employees?: {
+      full_name: string;
+    };
+  }[];
+
   stores?: {
     company_name: string;
     store_name: string;
@@ -138,12 +145,13 @@ const [showReports, setShowReports] = useState(true);
     store: "",
     issue: "",
     employee_id: "",
+    additional_employee_ids: [] as string[],
     status: "Open",
     category: "General",
     priority: "Medium",
     due_date: "",
     company_name: "",
-location: "",
+    location: "",
   });
 
   useEffect(() => {
@@ -328,7 +336,14 @@ const paginatedTasks = filteredTasks.slice(
   async function loadTasks(employee?: Employee | null) {
     let query = supabase
       .from("tasks")
-      .select("*, employees(full_name, role)")
+      .select(`
+        *,
+        employees(full_name, role),
+        task_assignments(
+          employee_id,
+          employees(full_name)
+        )
+      `)
       .order("created_at", { ascending: false });
   
     const role = employee?.role?.toLowerCase();
@@ -355,8 +370,11 @@ const paginatedTasks = filteredTasks.slice(
       alert("Please fill Store and Issue");
       return;
     }
-
-    const selectedEmployee = employees.find((e) => e.id === newTask.employee_id);
+  
+    const selectedEmployee = employees.find(
+      (e) => e.id === newTask.employee_id
+    );
+  
     const taskPayload = {
       store: newTask.store,
       company_name: newTask.company_name || "",
@@ -372,27 +390,68 @@ const paginatedTasks = filteredTasks.slice(
       technician: selectedEmployee?.full_name || "",
       created_by: currentEmployee?.full_name || "Retail Systems",
     };
-
-    const { error } = editingTask
-    ? await supabase
-        .from("tasks")
-        .update(taskPayload)
-        .eq("id", editingTask.id)
-    : await supabase
-        .from("tasks")
-        .insert([taskPayload]);
-
+  
+    let taskId = editingTask?.id;
+  
+    const { data, error } = editingTask
+      ? await supabase
+          .from("tasks")
+          .update(taskPayload)
+          .eq("id", editingTask.id)
+          .select("id")
+          .single()
+      : await supabase
+          .from("tasks")
+          .insert([taskPayload])
+          .select("id")
+          .single();
+  
     if (error) {
       console.error(error);
       alert("Error while saving task");
       return;
     }
-
+  
+    taskId = data?.id || taskId;
+  
+    if (taskId) {
+      await supabase
+        .from("task_assignments")
+        .delete()
+        .eq("task_id", taskId);
+  
+      const allAssignedEmployeeIds = [
+        newTask.employee_id,
+        ...newTask.additional_employee_ids,
+      ].filter(Boolean);
+  
+      if (allAssignedEmployeeIds.length > 0) {
+        const assignmentRows = allAssignedEmployeeIds.map((employeeId) => ({
+          task_id: taskId,
+          employee_id: employeeId,
+        }));
+  
+        const { error: assignmentError } = await supabase
+          .from("task_assignments")
+          .insert(assignmentRows);
+  
+          if (assignmentError) {
+            console.error("Assignment error:", JSON.stringify(assignmentError, null, 2));
+            alert(
+              assignmentError.message ||
+                assignmentError.details ||
+                "Task saved, but assignments were not saved"
+            );
+          }
+      }
+    }
+  
     setNewTask({
       store_id: "",
       store: "",
       issue: "",
       employee_id: "",
+      additional_employee_ids: [],
       status: "Open",
       category: "General",
       priority: "Medium",
@@ -400,11 +459,16 @@ const paginatedTasks = filteredTasks.slice(
       company_name: "",
       location: "",
     });
-
+  
+    setEditingTask(null);
     setShowForm(false);
-    loadTasks();
+  
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
   }
-
   async function updateStatus(taskId: number, status: string) {
     const currentTask = tasks.find((t) => t.id === taskId);
     const oldStatus = currentTask?.status || "";
@@ -1225,127 +1289,280 @@ transition: "all 0.2s ease",
 color: textColor,
   }}
 >
-          <h2>Add New Service Task</h2>
+<h2>Add New Service Task</h2>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "15px", marginTop: "20px" }}>
-          <input
-  placeholder="Search store..."
-  value={storeSearchText}
-  onChange={(e) => setStoreSearchText(e.target.value)}
-  style={inputStyle}
-/>
-          <select
-  value={newTask.store_id}
-  onChange={(e) => {
-    const selectedStore = stores.find(
-      (store) => store.id.toString() === e.target.value
-    );
-
-    setNewTask({
-      ...newTask,
-      store_id: e.target.value,
-      store: selectedStore
-  ? `${selectedStore.company_name} / ${selectedStore.store_name} / ${selectedStore.location}`
-  : "",
-  company_name: selectedStore?.company_name || "",
-location: selectedStore?.location || "",
-    });
-  }}
-  style={inputStyle}
->
-  <option value="">Select store</option>
-
-  {stores
-  .filter((store) =>
-    `${store.company_name} ${store.store_name} ${store.location}`
-      .toLowerCase()
-      .includes(storeSearchText.toLowerCase())
-  )
-  .map((store) => {
-  if (!store.company_name || !store.store_name || !store.location)
-    return null;
-
-  return (
-    <option key={store.id} value={store.id}>
-      {store.company_name} / {store.store_name} / {store.location}
-    </option>
-  );
-})}
-</select>
-
-<textarea
-  placeholder="Issue / Work Description"
-  value={newTask.issue}
-  onChange={(e) => setNewTask({ ...newTask, issue: e.target.value })}
+<div
   style={{
-    ...inputStyle,
-    minHeight: "120px",
-    resize: "vertical",
-    lineHeight: "1.5",
+    display: "grid",
+    gap: "22px",
+    marginTop: "20px",
   }}
-/>
+>
+  <div>
+    <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
+      Store
+    </label>
 
-            <select
-              value={newTask.employee_id}
-              onChange={(e) => setNewTask({ ...newTask, employee_id: e.target.value })}
-              style={inputStyle}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+        gap: "14px",
+      }}
+    >
+      <input
+        placeholder="Search store..."
+        value={storeSearchText}
+        onChange={(e) => setStoreSearchText(e.target.value)}
+        style={inputStyle}
+      />
+
+      <select
+        value={newTask.store_id}
+        onChange={(e) => {
+          const selectedStore = stores.find(
+            (store) => store.id.toString() === e.target.value
+          );
+
+          setNewTask({
+            ...newTask,
+            store_id: e.target.value,
+            store: selectedStore
+              ? `${selectedStore.company_name} / ${selectedStore.store_name} / ${selectedStore.location}`
+              : "",
+            company_name: selectedStore?.company_name || "",
+            location: selectedStore?.location || "",
+          });
+        }}
+        style={inputStyle}
+      >
+        <option value="">Select store</option>
+
+        {stores
+          .filter((store) =>
+            `${store.company_name} ${store.store_name} ${store.location}`
+              .toLowerCase()
+              .includes(storeSearchText.toLowerCase())
+          )
+          .map((store) => {
+            if (!store.company_name || !store.store_name || !store.location)
+              return null;
+
+            return (
+              <option key={store.id} value={store.id}>
+                {store.company_name} / {store.store_name} / {store.location}
+              </option>
+            );
+          })}
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
+      Work Description
+    </label>
+
+    <textarea
+      placeholder="Issue / Work Description"
+      value={newTask.issue}
+      onChange={(e) => setNewTask({ ...newTask, issue: e.target.value })}
+      style={{
+        ...inputStyle,
+        minHeight: "120px",
+        resize: "vertical",
+        lineHeight: "1.5",
+      }}
+    />
+  </div>
+
+  <div>
+    <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
+      Technicians
+    </label>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+        gap: "14px",
+      }}
+    >
+      <select
+        value={newTask.employee_id}
+        onChange={(e) =>
+          setNewTask({
+            ...newTask,
+            employee_id: e.target.value,
+            additional_employee_ids: newTask.additional_employee_ids.filter(
+              (id) => id !== e.target.value
+            ),
+          })
+        }
+        style={inputStyle}
+      >
+        <option value="">Primary technician</option>
+
+        {visibleEmployees.map((employee) => (
+          <option key={employee.id} value={employee.id}>
+            {employee.full_name} ({employee.role})
+          </option>
+        ))}
+      </select>
+
+      <select
+        value=""
+        onChange={(e) => {
+          const selectedId = e.target.value;
+          if (!selectedId) return;
+          if (newTask.additional_employee_ids.includes(selectedId)) return;
+
+          setNewTask({
+            ...newTask,
+            additional_employee_ids: [
+              ...newTask.additional_employee_ids,
+              selectedId,
+            ],
+          });
+        }}
+        style={inputStyle}
+      >
+        <option value="">Add additional technician</option>
+
+        {visibleEmployees
+          .filter(
+            (employee) =>
+              String(employee.id) !== String(newTask.employee_id) &&
+              !newTask.additional_employee_ids.includes(String(employee.id))
+          )
+          .map((employee) => (
+            <option key={employee.id} value={employee.id}>
+              {employee.full_name} ({employee.role})
+            </option>
+          ))}
+      </select>
+    </div>
+
+    {newTask.additional_employee_ids.length > 0 && (
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          flexWrap: "wrap",
+          marginTop: "10px",
+        }}
+      >
+        {newTask.additional_employee_ids.map((id) => {
+          const employee = visibleEmployees.find(
+            (e) => String(e.id) === String(id)
+          );
+
+          return (
+            <div
+              key={id}
+              style={{
+                background: "#dbeafe",
+                color: "#1d4ed8",
+                padding: "6px 10px",
+                borderRadius: "999px",
+                fontSize: "13px",
+                fontWeight: "600",
+              }}
             >
-              <option value="">Select employee</option>
-              {visibleEmployees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.full_name} ({employee.role})
-                </option>
-              ))}
-            </select>
+              {employee?.full_name || "Employee"}
 
-            <select
-              value={newTask.status}
-              onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
-              style={inputStyle}
-            >
-              <option>Open</option>
-              <option>In Progress</option>
-              <option>Waiting Parts</option>
-              <option>Completed</option>
-            </select>
+              <button
+                type="button"
+                onClick={() =>
+                  setNewTask({
+                    ...newTask,
+                    additional_employee_ids:
+                      newTask.additional_employee_ids.filter(
+                        (employeeId) => employeeId !== id
+                      ),
+                  })
+                }
+                style={{
+                  marginLeft: "8px",
+                  border: "none",
+                  background: "transparent",
+                  color: "#1d4ed8",
+                  cursor: "pointer",
+                  fontWeight: "700",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
 
-            <select
-              value={newTask.category}
-              onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-              style={inputStyle}
-            >
-              <option>General</option>
-<option>Construction</option>
-<option>Systems</option>
-<option>Inventory</option>
-            </select>
+  <div>
+    <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
+      Task Details
+    </label>
 
-            <select
-              value={newTask.priority}
-              onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-              style={inputStyle}
-            >
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-              <option>Urgent</option>
-            </select>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
+        gap: "14px",
+      }}
+    >
+      <select
+        value={newTask.status}
+        onChange={(e) => setNewTask({ ...newTask, status: e.target.value })}
+        style={inputStyle}
+      >
+        <option>Open</option>
+        <option>In Progress</option>
+        <option>Waiting Parts</option>
+        <option>Completed</option>
+      </select>
 
-            <input
-              type="date"
-              value={newTask.due_date}
-              onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-              style={inputStyle}
-            />
-          </div>
+      <select
+        value={newTask.category}
+        onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
+        style={inputStyle}
+      >
+        <option>General</option>
+        <option>Construction</option>
+        <option>Systems</option>
+        <option>Inventory</option>
+      </select>
 
-          {canCreateTask && (
+      <select
+        value={newTask.priority}
+        onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
+        style={inputStyle}
+      >
+        <option>Low</option>
+        <option>Medium</option>
+        <option>High</option>
+        <option>Urgent</option>
+      </select>
+
+      <input
+        type="date"
+        value={newTask.due_date}
+        onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+        style={inputStyle}
+      />
+    </div>
+  </div>
+  </div>
+
+{canCreateTask && (
   <button
     onClick={addTask}
     style={{ ...buttonStyle, marginTop: "20px" }}
   >
     Save Task
   </button>
+
 )}
         </div>
         </TaskForm>
@@ -2132,8 +2349,19 @@ currentEmployee={currentEmployee}
     </td>
     <td style={tdStyle}>{task.due_date || "-"}</td>
     <td style={tdStyle}>
-      {task.employees?.full_name || task.technician || "Not assigned"}
-    </td>
+  {task.task_assignments &&
+  task.task_assignments.length > 0 ? (
+    task.task_assignments.map((assignment) => (
+      <div key={assignment.employee_id}>
+        {assignment.employees?.full_name}
+      </div>
+    ))
+  ) : (
+    task.employees?.full_name ||
+    task.technician ||
+    "Not assigned"
+  )}
+</td>
     <td style={tdStyle}>
     {canEdit ? (
   <select
@@ -2211,6 +2439,7 @@ currentEmployee={currentEmployee}
         store: task.store || "",
         issue: task.issue || "",
         employee_id: task.employee_id || "",
+        additional_employee_ids: [],
         status: task.status || "Open",
         category: task.category || task.department || "General",
         priority: task.priority || "Medium",
@@ -2481,6 +2710,8 @@ const tdStyle = {
 };
 
 const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box" as const,
   padding: "14px",
   borderRadius: "10px",
   border: "1px solid #ddd",
