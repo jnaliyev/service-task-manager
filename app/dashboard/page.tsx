@@ -121,6 +121,7 @@ const tasksPerPage = 10;
   const [employeeFilter, setEmployeeFilter] = useState("All");
 
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [topKpiFilter, setTopKpiFilter] = useState("All");
   const [searchText, setSearchText] = useState("");
   const [companyFilter, setCompanyFilter] = useState("All");
 const [locationFilter, setLocationFilter] = useState("All");
@@ -212,6 +213,16 @@ location: "",
   
       const matchCategory =
         categoryFilter === "All" || task.category === categoryFilter;
+        const matchTopKpi =
+  topKpiFilter === "All" ||
+  (topKpiFilter === "open" &&
+    task.status !== "Completed") ||
+  (topKpiFilter === "urgent" &&
+    task.priority === "Urgent") ||
+  (topKpiFilter === "overdue" &&
+    task.due_date &&
+    task.status !== "Completed" &&
+    new Date(task.due_date) < new Date());
         const matchCompany =
   companyFilter === "All" ||
   task.stores?.company_name === companyFilter;
@@ -240,6 +251,7 @@ location: "",
       
   return (
     roleAccess &&
+    matchTopKpi &&
     matchStatus &&
     matchEmployee &&
     matchCategory &&
@@ -257,6 +269,7 @@ location: "",
     companyFilter,
     locationFilter,
     searchText,
+    topKpiFilter,
   ]);
 
   const reportingOpenTasks = filteredTasks.filter(
@@ -803,42 +816,71 @@ return (
     marginTop: "10px",
   }}
 >
-        <div style={cardStyle}>
-          <h3>Open Tasks</h3>
-          <p style={numberStyle}>{tasks.filter((t) => t.status !== "Completed").length}</p>
-   
-        </div>
-        <div style={cardStyle}>
-        <h3 style={{ color: darkMode ? "#f9fafb" : "#111827" }}>
-  Total Tasks
-</h3>
-<p style={numberStyle}>{totalKpiTasks}</p>
+<div
+  onClick={() => {
+    setTopKpiFilter(topKpiFilter === "open" ? "All" : "open");
+    setCurrentPage(1);
+  }}
+  style={{
+    ...cardStyle,
+    cursor: "pointer",
+    border:
+      topKpiFilter === "open"
+        ? "2px solid #2563eb"
+        : "1px solid #e5e7eb",
+  }}
+>
+  <h3>Open Tasks</h3>
+  <p style={numberStyle}>
+    {tasks.filter((t) => t.status !== "Completed").length}
+  </p>
+</div>
+<div
+  onClick={() => {
+    setTopKpiFilter("All");
+    setStatusFilter("All");
+    setEmployeeFilter("All");
+    setCategoryFilter("All");
+    setCompanyFilter("All");
+    setLocationFilter("All");
+    setSearchText("");
+    setCurrentPage(1);
+  }}
+  style={{
+    ...cardStyle,
+    cursor: "pointer",
+    border:
+      topKpiFilter === "All"
+        ? "2px solid #2563eb"
+        : "1px solid #e5e7eb",
+  }}
+>
+  <h3>Total Tasks</h3>
+  <p style={numberStyle}>{totalKpiTasks}</p>
 </div>
 
 <div
+  onClick={() => {
+    setTopKpiFilter(
+      topKpiFilter === "overdue"
+        ? "All"
+        : "overdue"
+    );
+
+    setCurrentPage(1);
+  }}
   style={{
     ...cardStyle,
-    background:
-      tasks.filter(
-        (task) =>
-          task.due_date &&
-          new Date(task.due_date) < new Date() &&
-          task.status !== "Completed"
-      ).length > 0
-        ? "#fee2e2"
-        : "white",
+    cursor: "pointer",
+    background: "#fee2e2",
     border:
-      tasks.filter(
-        (task) =>
-          task.due_date &&
-          new Date(task.due_date) < new Date() &&
-          task.status !== "Completed"
-      ).length > 0
-        ? "2px solid #dc2626"
-        : "none",
+      topKpiFilter === "overdue"
+        ? "2px solid #2563eb"
+        : "2px solid #dc2626",
   }}
 >
-<h3>Overdue</h3>
+  <h3>Overdue</h3>
+
   <p style={numberStyle}>
     {
       tasks.filter(
@@ -850,10 +892,31 @@ return (
     }
   </p>
 </div>
-        <div style={cardStyle}>
-          <h3>Urgent</h3>
-          <p style={numberStyle}>{tasks.filter((t) => t.priority === "Urgent").length}</p>
-        </div>
+<div
+  onClick={() => {
+    setTopKpiFilter(
+      topKpiFilter === "urgent"
+        ? "All"
+        : "urgent"
+    );
+
+    setCurrentPage(1);
+  }}
+  style={{
+    ...cardStyle,
+    cursor: "pointer",
+    border:
+      topKpiFilter === "urgent"
+        ? "2px solid #2563eb"
+        : "1px solid #e5e7eb",
+  }}
+>
+  <h3>Urgent</h3>
+
+  <p style={numberStyle}>
+    {tasks.filter((t) => t.priority === "Urgent").length}
+  </p>
+</div>
 
         <div style={cardStyle}>
           <h3>Employees</h3>
