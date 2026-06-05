@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 type Props = {
     task: any;
     buttonStyle: React.CSSProperties;
@@ -16,7 +17,10 @@ type Props = {
     currentEmployee: any;
     photos: any[];
   };
-  
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   export default function TaskMobileCard({
     task,
     buttonStyle,
@@ -260,11 +264,17 @@ Created by: ${task.created_by || currentEmployee?.full_name || "Retail Systems"}
 </button>
 <button
   onClick={async () => {
-    const taskPhotos = photos.filter(
-      (photo) => Number(photo.task_id) === Number(task.id)
-    );
-
-    const latestPhoto = taskPhotos[0];
+    const { data: taskPhotos, error: photoError } = await supabase
+    .from("task_photos")
+    .select("*")
+    .eq("task_id", task.id)
+    .order("created_at", { ascending: false });
+  
+  if (photoError) {
+    console.error(photoError);
+  }
+  
+  const latestPhoto = taskPhotos?.[0];
 
     const text = `
 ✅ SERVICE TASK COMPLETED
