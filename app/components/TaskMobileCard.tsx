@@ -328,7 +328,7 @@ Created by: ${task.created_by || currentEmployee?.full_name || "Retail Systems"}
     cursor: "pointer",
   }}
 >
-  📷 Share Act Photo
+📷 WhatsApp with Act Link
 </button>
         </div>
       </div>
