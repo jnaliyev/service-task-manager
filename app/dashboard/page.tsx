@@ -2205,6 +2205,7 @@ color: textColor,
       highlightStyle={{}}
 updateStatus={updateStatus}
 currentEmployee={currentEmployee}
+photos={photos}
     />
   ))}
 </div>

@@ -14,6 +14,7 @@ type Props = {
   
     setSelectedPhotoTaskId: (id: number) => void;
     currentEmployee: any;
+    photos: any[];
   };
   
   export default function TaskMobileCard({
@@ -27,6 +28,7 @@ type Props = {
     uploadPhoto,
     setSelectedPhotoTaskId,
     currentEmployee,
+    photos,
     updateStatus,
  
   }: Props) {
@@ -255,6 +257,78 @@ Created by: ${task.created_by || currentEmployee?.full_name || "Retail Systems"}
   }}
 >
   WhatsApp Message
+</button>
+<button
+  onClick={async () => {
+    const taskPhotos = photos.filter(
+      (photo) => Number(photo.task_id) === Number(task.id)
+    );
+
+    const latestPhoto = taskPhotos[0];
+
+    const text = `
+✅ SERVICE TASK COMPLETED
+
+Store: ${task.stores?.store_name || task.store || ""}
+
+Issue: ${task.issue || ""}
+Status: ${task.status || ""}
+Technician: ${task.technician || "Not assigned"}
+
+Created by: ${task.created_by || currentEmployee?.full_name || "Retail Systems"}
+`;
+
+    if (!latestPhoto?.photo_url) {
+      window.open(
+        `https://wa.me/?text=${encodeURIComponent(text.trim())}`,
+        "_blank"
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(latestPhoto.photo_url);
+      const blob = await response.blob();
+
+      const file = new File([blob], "service-act.jpg", {
+        type: blob.type || "image/jpeg",
+      });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: "Service Act",
+          text: text.trim(),
+          files: [file],
+        });
+      } else {
+        window.open(
+          `https://wa.me/?text=${encodeURIComponent(
+            `${text.trim()}\n\nPhoto: ${latestPhoto.photo_url}`
+          )}`,
+          "_blank"
+        );
+      }
+    } catch (error) {
+      console.error(error);
+
+      window.open(
+        `https://wa.me/?text=${encodeURIComponent(
+          `${text.trim()}\n\nPhoto: ${latestPhoto.photo_url}`
+        )}`,
+        "_blank"
+      );
+    }
+  }}
+  style={{
+    background: "#0ea5e9",
+    color: "white",
+    padding: "10px 14px",
+    borderRadius: "8px",
+    border: "none",
+    cursor: "pointer",
+  }}
+>
+  📷 Share Act Photo
 </button>
         </div>
       </div>
