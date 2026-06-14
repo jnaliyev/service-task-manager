@@ -26,6 +26,8 @@ export default function AssetsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 const assetsPerPage = 10;
   const [showAddAssetForm, setShowAddAssetForm] = useState(false);
+  const [isAddingAsset, setIsAddingAsset] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   console.log(assets);
 
   const [newAsset, setNewAsset] = useState({
@@ -69,39 +71,49 @@ const assetsPerPage = 10;
   }
 
   async function addAsset() {
+    if (isAddingAsset) return;
+  
     if (!newAsset.asset_name.trim()) {
       alert("Enter asset name");
       return;
     }
-
-    const { error } = await supabase.from("fixed_assets").insert([
-      {
-        ...newAsset,
-        project_id: Number(
-          new URLSearchParams(window.location.search).get("project")
-        ),
-        barcode: generateBarcode(),
-      },
-    ]);
-
-    if (error) {
-      alert(error.message);
-      return;
+  
+    setIsAddingAsset(true);
+  
+    try {
+      const projectId = new URLSearchParams(window.location.search).get("project");
+  
+      const { error } = await supabase.from("fixed_assets").insert([
+        {
+          ...newAsset,
+          project_id: projectId ? Number(projectId) : null,
+          barcode: generateBarcode(),
+        },
+      ]);
+  
+      if (error) {
+        alert(error.message);
+        return;
+      }
+  
+      setNewAsset({
+        asset_name: "",
+        category: "",
+        location: "",
+        store: "",
+        responsible_person: "",
+        quantity: 1,
+        status: "Active",
+        notes: "",
+      });
+  
+      await loadAssets();
+    } finally {
+      setIsAddingAsset(false);
     }
-
-    setNewAsset({
-      asset_name: "",
-      category: "",
-      location: "",
-      store: "",
-      responsible_person: "",
-      quantity: 1,
-      status: "Active",
-      notes: "",
-    });
-
-    loadAssets();
   }
+
+
   async function uploadPhoto(assetId: number, file: File) {
     const fileExt = file.name.split(".").pop();
   
@@ -191,11 +203,25 @@ const assetsPerPage = 10;
     border: "1px solid #e5e7eb",
   };
 
-  const filteredAssets = assets.filter((asset) =>
-    `${asset.asset_name} ${asset.category} ${asset.location} ${asset.store} ${asset.responsible_person} ${asset.barcode}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
+ const filteredAssets = assets.filter((asset) => {
+  const searchableText = [
+    asset.id,
+    asset.asset_name,
+    asset.category,
+    asset.location,
+    asset.store,
+    asset.responsible_person,
+    asset.quantity,
+    asset.status,
+    asset.barcode,
+    asset.notes,
+    asset.verified ? "verified yes checked" : "pending no unchecked",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return searchableText.includes(search.toLowerCase().trim());
+});
   const totalPages = Math.ceil(
     filteredAssets.length / assetsPerPage
   );
@@ -238,40 +264,114 @@ const damagedAssets = assets.filter(
 
 
 
-  function exportToExcel() {
-    const rows = filteredAssets.map((asset, index) => ({
-      No: index + 1,
-      Asset: asset.asset_name,
-      Category: asset.category,
-      Location: asset.location,
-      Object: asset.store,
-      Responsible: asset.responsible_person,
-      Quantity: asset.quantity,
-      Status: asset.status,
-      Barcode: asset.barcode,
-      Notes: asset.notes,
-    }));
-  
-    const headers = Object.keys(rows[0] || {});
-    const csv = [
-      headers.join(","),
-      ...rows.map((row) =>
-        headers
-          .map((header) => `"${String(row[header as keyof typeof row] || "").replace(/"/g, '""')}"`)
-          .join(",")
-      ),
-    ].join("\n");
-  
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-  
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "fixed-assets.csv";
-    link.click();
-  
-    URL.revokeObjectURL(url);
-  }
+ function exportToExcel() {
+  const rows = filteredAssets.map((asset, index) => ({
+    No: index + 1,
+    Asset: asset.asset_name || "",
+    Category: asset.category || "",
+    Location: asset.location || "",
+    Object: asset.store || "",
+    Responsible: asset.responsible_person || "",
+    Quantity: asset.quantity || "",
+    Status: asset.status || "",
+    Barcode: asset.barcode ? `="${asset.barcode}"` : "",
+    Notes: asset.notes || "",
+    Verified: asset.verified ? "Yes" : "No",
+  }));
+
+  const headers = [
+    "No",
+    "Asset",
+    "Category",
+    "Location",
+    "Object",
+    "Responsible",
+    "Quantity",
+    "Status",
+    "Barcode",
+    "Notes",
+    "Verified",
+  ];
+
+  const csv = [
+    headers.join(";"),
+    ...rows.map((row) =>
+      headers
+        .map((header) => {
+          const value = String(row[header as keyof typeof row] ?? "");
+          return `"${value.replace(/"/g, '""')}"`;
+        })
+        .join(";")
+    ),
+  ].join("\n");
+
+  const blob = new Blob(["\uFEFF" + csv], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "fixed-assets-export.csv";
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+function exportAllAssets() {
+  const rows = assets.map((asset, index) => ({
+    No: index + 1,
+    Asset: asset.asset_name || "",
+    Category: asset.category || "",
+    Location: asset.location || "",
+    Object: asset.store || "",
+    Responsible: asset.responsible_person || "",
+    Quantity: asset.quantity || "",
+    Status: asset.status || "",
+    Barcode: asset.barcode ? `="${asset.barcode}"` : "",
+    Notes: asset.notes || "",
+    Verified: asset.verified ? "Yes" : "No",
+  }));
+
+  const headers = [
+    "No",
+    "Asset",
+    "Category",
+    "Location",
+    "Object",
+    "Responsible",
+    "Quantity",
+    "Status",
+    "Barcode",
+    "Notes",
+    "Verified",
+  ];
+
+  const csv = [
+    headers.join(";"),
+    ...rows.map((row) =>
+      headers
+        .map((header) => {
+          const value = String(row[header as keyof typeof row] ?? "");
+          return `"${value.replace(/"/g, '""')}"`;
+        })
+        .join(";")
+    ),
+  ].join("\n");
+
+  const blob = new Blob(["\uFEFF" + csv], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "all-assets-export.csv";
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
 
   return (
     <div style={{ padding: 24, color: "#111827" }}>
@@ -404,7 +504,7 @@ const damagedAssets = assets.filter(
   }}
 />
 <button
-  onClick={exportToExcel}
+  onClick={exportAllAssets}
   style={{
     marginTop: 16,
     marginLeft: 12,
@@ -417,7 +517,24 @@ const damagedAssets = assets.filter(
     fontWeight: 700,
   }}
 >
-  Export Excel
+  Export All Assets
+</button>
+
+<button
+  onClick={exportToExcel}
+  style={{
+    marginTop: 16,
+    marginLeft: 12,
+    background: "#2563eb",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 700,
+  }}
+>
+  Export Filtered Assets
 </button>
 
       <div
@@ -507,19 +624,20 @@ const damagedAssets = assets.filter(
           <textarea style={inputStyle} placeholder="Notes" value={newAsset.notes} onChange={(e) => setNewAsset({ ...newAsset, notes: e.target.value })} />
 
           <button
-            onClick={addAsset}
-            style={{
-              background: "#111827",
-              color: "white",
-              padding: "13px",
-              borderRadius: 8,
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            Add Asset
-          </button>
+  onClick={addAsset}
+  disabled={isAddingAsset}
+  style={{
+    background: isAddingAsset ? "#9ca3af" : "#111827",
+    color: "white",
+    padding: "13px",
+    borderRadius: 8,
+    border: "none",
+    cursor: isAddingAsset ? "not-allowed" : "pointer",
+    fontWeight: 700,
+  }}
+>
+  {isAddingAsset ? "Saving..." : "Add Asset"}
+</button>
           </div>
       </div>
         )}
@@ -565,18 +683,21 @@ const damagedAssets = assets.filter(
 </td>
                 <td style={tdStyle}>
   <div style={{ display: "grid", gap: 8 }}>
-    {asset.photo_url && (
-      <img
-        src={asset.photo_url}
-        alt=""
-        style={{
-          width: 70,
-          height: 70,
-          objectFit: "cover",
-          borderRadius: 8,
-        }}
-      />
-    )}
+   {asset.photo_url && (
+  <img
+    src={asset.photo_url}
+    alt=""
+    onClick={() => setSelectedPhoto(asset.photo_url)}
+    style={{
+      width: 70,
+      height: 70,
+      objectFit: "cover",
+      borderRadius: 8,
+      cursor: "zoom-in",
+      border: "1px solid #e5e7eb",
+    }}
+  />
+)}
 
 <label
   style={{
@@ -683,7 +804,23 @@ const damagedAssets = assets.filter(
   )}
 </td>
 <td style={tdStyle}>
-  {asset.responsible_person}
+  {editingId === asset.id ? (
+    <input
+      value={asset.responsible_person}
+      onChange={(e) => {
+        setAssets((prev) =>
+          prev.map((a) =>
+            a.id === asset.id
+              ? { ...a, responsible_person: e.target.value }
+              : a
+          )
+        );
+      }}
+      style={inputStyle}
+    />
+  ) : (
+    asset.responsible_person
+  )}
 </td>
 <td style={tdStyle}>
   {editingId === asset.id ? (
@@ -977,7 +1114,34 @@ const damagedAssets = assets.filter(
   </button>
 </div>
 
-      </div>
+       </div>
+
+      {selectedPhoto && (
+        <div
+          onClick={() => setSelectedPhoto(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+            cursor: "pointer",
+          }}
+        >
+          <img
+            src={selectedPhoto}
+            alt=""
+            style={{
+              maxWidth: "90%",
+              maxHeight: "90%",
+              borderRadius: 12,
+              background: "white",
+            }}
+          />
+        </div>
+      )}
     </div>
    
   );
