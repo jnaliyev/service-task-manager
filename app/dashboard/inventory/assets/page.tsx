@@ -28,6 +28,7 @@ const assetsPerPage = 10;
   const [showAddAssetForm, setShowAddAssetForm] = useState(false);
   const [isAddingAsset, setIsAddingAsset] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
   console.log(assets);
 
   const [newAsset, setNewAsset] = useState({
@@ -372,6 +373,75 @@ function exportAllAssets() {
 
   URL.revokeObjectURL(url);
 }
+function printSelectedLabels() {
+  const selectedAssets = assets.filter((asset) =>
+    selectedAssetIds.includes(asset.id)
+  );
+
+  if (selectedAssets.length === 0) {
+    alert("Please select at least one asset");
+    return;
+  }
+
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Print Selected Labels</title>
+      </head>
+      <body style="font-family: Arial; padding: 20px;">
+        <div style="
+          display: grid;
+          grid-template-columns: repeat(2, 300px);
+          gap: 20px;
+        ">
+          ${selectedAssets
+            .map(
+              (asset) => `
+                <div style="
+                  width: 300px;
+                  text-align: center;
+                  border: 1px solid #ddd;
+                  padding: 12px;
+                  box-sizing: border-box;
+                  page-break-inside: avoid;
+                ">
+                  <h3 style="margin: 0 0 10px 0; font-size: 16px;">
+                    ${asset.asset_name || ""}
+                  </h3>
+
+                  <img
+                    src="https://barcodeapi.org/api/128/${asset.barcode}"
+                    style="width: 260px; height: 70px;"
+                  />
+
+                  <div style="margin-top: 8px; font-size: 13px;">
+                    ${asset.barcode || ""}
+                  </div>
+
+                  <div style="margin-top: 6px; font-size: 13px;">
+                    ${asset.store || ""}
+                  </div>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+}
 
   return (
     <div style={{ padding: 24, color: "#111827" }}>
@@ -536,7 +606,22 @@ function exportAllAssets() {
 >
   Export Filtered Assets
 </button>
-
+<button
+  onClick={printSelectedLabels}
+  style={{
+    marginTop: 16,
+    marginLeft: 12,
+    background: "#ea580c",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 700,
+  }}
+>
+  Print Selected Labels
+</button>
       <div
         style={{
           marginTop: 24,
@@ -648,6 +733,7 @@ function exportAllAssets() {
           <thead>
           <tr style={{ background: "#f3f4f6" }}>
   {[
+    "Select",
     "No.",
     "Photo",
     "Asset",
@@ -678,6 +764,22 @@ function exportAllAssets() {
           <tbody>
           {paginatedAssets.map((asset, index) => (
               <tr key={asset.id}>
+<td style={tdStyle}>
+  <input
+    type="checkbox"
+    checked={selectedAssetIds.includes(asset.id)}
+    onChange={(e) => {
+      if (e.target.checked) {
+        setSelectedAssetIds((prev) => [...prev, asset.id]);
+      } else {
+        setSelectedAssetIds((prev) =>
+          prev.filter((id) => id !== asset.id)
+        );
+      }
+    }}
+  />
+</td>
+
                 <td style={tdStyle}>
   {(currentPage - 1) * assetsPerPage + index + 1}
 </td>
