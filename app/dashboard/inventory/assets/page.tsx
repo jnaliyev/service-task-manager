@@ -28,6 +28,7 @@ const assetsPerPage = 10;
   const [showAddAssetForm, setShowAddAssetForm] = useState(false);
   const [isAddingAsset, setIsAddingAsset] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [uploadingAssetId, setUploadingAssetId] = useState<number | null>(null);
   const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
   console.log(assets);
 
@@ -44,6 +45,7 @@ const assetsPerPage = 10;
 
   useEffect(() => {
     loadAssets();
+    loadEmployees();
   }, []);
 
   async function loadAssets() {
@@ -65,7 +67,19 @@ const assetsPerPage = 10;
     }
   }
 
+  async function loadEmployees() {
+    const { data, error } = await supabase
+      .from("employees")
+      .select("id, full_name")
+      .order("full_name", { ascending: true });
   
+    if (error) {
+      console.error("Employees fetch error:", error);
+      return;
+    }
+  
+    setEmployees(data || []);
+  }
 
   function generateBarcode() {
     return "AST-" + Date.now();
@@ -116,6 +130,7 @@ const assetsPerPage = 10;
 
 
   async function uploadPhoto(assetId: number, file: File) {
+    setUploadingAssetId(assetId);
     const fileExt = file.name.split(".").pop();
   
     const fileName = `${assetId}-${Date.now()}.${fileExt}`;
@@ -124,10 +139,11 @@ const assetsPerPage = 10;
       .from("asset-photos")
       .upload(fileName, file);
   
-    if (uploadError) {
-      alert(uploadError.message);
-      return;
-    }
+      if (uploadError) {
+        setUploadingAssetId(null);
+        alert(uploadError.message);
+        return;
+      }
   
     const publicUrl = supabase.storage
     .from("asset-photos")
@@ -140,12 +156,15 @@ const assetsPerPage = 10;
       })
       .eq("id", assetId);
   
-    if (error) {
-      alert(error.message);
-      return;
-    }
-  
-    loadAssets();
+      if (error) {
+        setUploadingAssetId(null);
+        alert(error.message);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setUploadingAssetId(null);
+      loadAssets();
   }
   async function updateAsset(asset: Asset) {
     const { error } = await supabase
@@ -373,6 +392,49 @@ function exportAllAssets() {
 
   URL.revokeObjectURL(url);
 }
+async function bulkVerifySelected() {
+  if (selectedAssetIds.length === 0) {
+    alert("Please select at least one asset");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("fixed_assets")
+    .update({
+      verified: true,
+    })
+    .in("id", selectedAssetIds);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  loadAssets();
+}
+async function bulkDeleteSelected() {
+  if (selectedAssetIds.length === 0) {
+    alert("Please select at least one asset");
+    return;
+  }
+
+  if (!confirm(`Delete ${selectedAssetIds.length} selected assets?`)) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("fixed_assets")
+    .delete()
+    .in("id", selectedAssetIds);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setSelectedAssetIds([]);
+  loadAssets();
+}
 function printSelectedLabels() {
   const selectedAssets = assets.filter((asset) =>
     selectedAssetIds.includes(asset.id)
@@ -589,7 +651,6 @@ function printSelectedLabels() {
 >
   Export All Assets
 </button>
-
 <button
   onClick={exportToExcel}
   style={{
@@ -606,6 +667,7 @@ function printSelectedLabels() {
 >
   Export Filtered Assets
 </button>
+
 <button
   onClick={printSelectedLabels}
   style={{
@@ -622,17 +684,50 @@ function printSelectedLabels() {
 >
   Print Selected Labels
 </button>
-      <div
-        style={{
-          marginTop: 24,
-          padding: 20,
-          border: "1px solid #e5e7eb",
-          borderRadius: 12,
-          maxWidth: 700,
-          background: "#f9fafb",
-        }}
-      >
 
+<button
+  onClick={bulkVerifySelected}
+  style={{
+    marginTop: 16,
+    marginLeft: 12,
+    background: "#16a34a",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 700,
+  }}
+>
+  Verify Selected
+</button>
+<button
+  onClick={bulkDeleteSelected}
+  style={{
+    marginTop: 16,
+    marginLeft: 12,
+    background: "#dc2626",
+    color: "white",
+    padding: "12px 18px",
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    fontWeight: 700,
+  }}
+>
+  Delete Selected
+</button>
+
+<div
+  style={{
+    marginTop: 24,
+    padding: 20,
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    maxWidth: 700,
+    background: "#f9fafb",
+  }}
+>
 <button
   onClick={() =>
     setShowAddAssetForm(!showAddAssetForm)
@@ -675,9 +770,8 @@ function printSelectedLabels() {
     })
   }
 />
-<input
+<select
   style={inputStyle}
-  placeholder="Responsible Person / Contact Person"
   value={newAsset.responsible_person}
   onChange={(e) =>
     setNewAsset({
@@ -685,7 +779,15 @@ function printSelectedLabels() {
       responsible_person: e.target.value,
     })
   }
-/>
+>
+  <option value="">Select Responsible Person</option>
+
+  {employees.map((employee) => (
+    <option key={employee.id} value={employee.full_name}>
+      {employee.full_name}
+    </option>
+  ))}
+</select>
           <input style={inputStyle} type="number" placeholder="Quantity" value={newAsset.quantity} onChange={(e) => setNewAsset({ ...newAsset, quantity: Number(e.target.value) })} />
           <select
   value={newAsset.status}
@@ -733,7 +835,7 @@ function printSelectedLabels() {
           <thead>
           <tr style={{ background: "#f3f4f6" }}>
   {[
-    "Select",
+    "",
     "No.",
     "Photo",
     "Asset",
@@ -755,7 +857,36 @@ function printSelectedLabels() {
         textAlign: "left",
       }}
     >
-      {h}
+      {h === "" ? (
+  <input
+    type="checkbox"
+    checked={
+      paginatedAssets.length > 0 &&
+      paginatedAssets.every((asset) =>
+        selectedAssetIds.includes(asset.id)
+      )
+    }
+    onChange={(e) => {
+      if (e.target.checked) {
+        setSelectedAssetIds((prev) => [
+          ...new Set([
+            ...prev,
+            ...paginatedAssets.map((a) => a.id),
+          ]),
+        ]);
+      } else {
+        setSelectedAssetIds((prev) =>
+          prev.filter(
+            (id) =>
+              !paginatedAssets.some((asset) => asset.id === id)
+          )
+        );
+      }
+    }}
+  />
+) : (
+  h
+)}
     </th>
   ))}
 </tr>
@@ -813,7 +944,9 @@ function printSelectedLabels() {
     width: "fit-content",
   }}
 >
-  Upload / Replace
+{uploadingAssetId === asset.id
+  ? "Uploading..."
+  : "Upload / Replace"}
   <input
     type="file"
     style={{ display: "none" }}
@@ -824,6 +957,18 @@ function printSelectedLabels() {
     }}
   />
 </label>
+{uploadingAssetId === asset.id && (
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 12,
+      color: "#2563eb",
+      fontWeight: 600,
+    }}
+  >
+    Uploading...
+  </div>
+)}
   </div>
 </td>
 
@@ -907,19 +1052,27 @@ function printSelectedLabels() {
 </td>
 <td style={tdStyle}>
   {editingId === asset.id ? (
-    <input
-      value={asset.responsible_person}
-      onChange={(e) => {
-        setAssets((prev) =>
-          prev.map((a) =>
-            a.id === asset.id
-              ? { ...a, responsible_person: e.target.value }
-              : a
-          )
-        );
-      }}
-      style={inputStyle}
-    />
+  <select
+  value={asset.responsible_person || ""}
+  onChange={(e) => {
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.id === asset.id
+          ? { ...a, responsible_person: e.target.value }
+          : a
+      )
+    );
+  }}
+  style={inputStyle}
+>
+  <option value="">Select Responsible Person</option>
+
+  {employees.map((employee) => (
+    <option key={employee.id} value={employee.full_name}>
+      {employee.full_name}
+    </option>
+  ))}
+</select>
   ) : (
     asset.responsible_person
   )}
