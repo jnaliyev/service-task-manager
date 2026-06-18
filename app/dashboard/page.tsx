@@ -140,6 +140,14 @@ const [showDepartmentKpi, setShowDepartmentKpi] = useState(false);
 const [showServiceKpi, setShowServiceKpi] = useState(false);
 const [showReports, setShowReports] = useState(true);
   const [storeSearchText, setStoreSearchText] = useState("");
+  const [showQuickAddStore, setShowQuickAddStore] = useState(false);
+
+const [quickStore, setQuickStore] = useState({
+  company_name: "",
+  store_name: "",
+  location: "",
+  store_code: "",
+});
   const [newTask, setNewTask] = useState({
     store_id: "",
     store: "",
@@ -332,6 +340,50 @@ const paginatedTasks = filteredTasks.slice(
     }
   
     setStores(data || []);
+  }
+  async function quickAddStore() {
+    if (!quickStore.company_name || !quickStore.store_name || !quickStore.location) {
+      alert("Please fill Company Name, Store Name and Location");
+      return;
+    }
+  
+    const { data, error } = await supabase
+      .from("stores")
+      .insert([
+        {
+          company_name: quickStore.company_name.trim(),
+          store_name: quickStore.store_name.trim(),
+          location: quickStore.location.trim(),
+          store_code: quickStore.store_code.trim(),
+        },
+      ])
+      .select("*")
+      .single();
+  
+    if (error) {
+      console.error(error);
+      alert("Error adding store");
+      return;
+    }
+  
+    await loadStores();
+  
+    setNewTask({
+      ...newTask,
+      store_id: String(data.id),
+      store: `${data.company_name} / ${data.store_name} / ${data.location}`,
+      company_name: data.company_name || "",
+      location: data.location || "",
+    });
+  
+    setQuickStore({
+      company_name: "",
+      store_name: "",
+      location: "",
+      store_code: "",
+    });
+  
+    setShowQuickAddStore(false);
   }
   async function loadTasks(employee?: Employee | null) {
     let query = supabase
@@ -797,6 +849,20 @@ return (
         }}
       >
         📦 Inventory Projects
+      </a>
+      <a
+        href="/dashboard/stores"
+        style={{
+          background: "#111827",
+          color: "white",
+          padding: "12px 18px",
+          borderRadius: 10,
+          textDecoration: "none",
+          fontWeight: 700,
+          display: "inline-block",
+        }}
+      >
+        🏪 Stores
       </a>
     </div>
 
@@ -1355,8 +1421,93 @@ color: textColor,
             );
           })}
       </select>
-    </div>
-  </div>
+
+<button
+  type="button"
+  onClick={() => setShowQuickAddStore(!showQuickAddStore)}
+  style={{
+    ...buttonStyle,
+    background: "#2563eb",
+  }}
+>
+  {showQuickAddStore ? "Cancel New Store" : "+ New Store"}
+</button>
+</div>
+
+{showQuickAddStore && (
+<div
+  style={{
+    marginTop: "16px",
+    padding: "16px",
+    borderRadius: "12px",
+    background: darkMode ? "#0f172a" : "#f8fafc",
+    border: "1px solid #e5e7eb",
+    display: "grid",
+    gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
+    gap: "12px",
+  }}
+>
+  <input
+    placeholder="Company Name"
+    value={quickStore.company_name}
+    onChange={(e) =>
+      setQuickStore({
+        ...quickStore,
+        company_name: e.target.value,
+      })
+    }
+    style={inputStyle}
+  />
+
+  <input
+    placeholder="Store Name"
+    value={quickStore.store_name}
+    onChange={(e) =>
+      setQuickStore({
+        ...quickStore,
+        store_name: e.target.value,
+      })
+    }
+    style={inputStyle}
+  />
+
+  <input
+    placeholder="Location"
+    value={quickStore.location}
+    onChange={(e) =>
+      setQuickStore({
+        ...quickStore,
+        location: e.target.value,
+      })
+    }
+    style={inputStyle}
+  />
+
+  <input
+    placeholder="Store Code (optional)"
+    value={quickStore.store_code}
+    onChange={(e) =>
+      setQuickStore({
+        ...quickStore,
+        store_code: e.target.value,
+      })
+    }
+    style={inputStyle}
+  />
+
+  <button
+    type="button"
+    onClick={quickAddStore}
+    style={{
+      ...buttonStyle,
+      background: "#16a34a",
+    }}
+  >
+    Save New Store
+  </button>
+</div>
+)}
+</div>
 
   <div>
     <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
