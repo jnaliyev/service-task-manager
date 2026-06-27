@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 type ClientRequestForm = {
   company: string;
@@ -13,9 +13,22 @@ type ClientRequestForm = {
   description: string;
 };
 
+type Store = {
+  id: number;
+  company_name: string | null;
+  store_name: string | null;
+  location: string | null;
+  store_code: string | null;
+};
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function ClientPortalPage() {
+  const [stores, setStores] = useState<Store[]>([]);
+
   const [form, setForm] = useState<ClientRequestForm>({
     company: "",
     store: "",
@@ -25,6 +38,54 @@ export default function ClientPortalPage() {
     priority: "Normal",
     description: "",
   });
+
+  useEffect(() => {
+    async function loadStores() {
+      const { data, error } = await supabase
+        .from("stores")
+        .select("id, company_name, store_name, location, store_code")
+        .order("company_name", { ascending: true })
+        .order("store_name", { ascending: true });
+
+      if (error) {
+        console.error("Error loading stores:", error);
+        return;
+      }
+
+      setStores(data || []);
+    }
+
+    loadStores();
+  }, []);
+
+  const companies = useMemo(() => {
+    const uniqueCompanies = new Set<string>();
+
+    stores.forEach((store) => {
+      const companyName = (store.company_name || "").trim();
+
+      if (companyName) {
+        uniqueCompanies.add(companyName);
+      }
+    });
+
+    return Array.from(uniqueCompanies).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [stores]);
+
+  const filteredStores = useMemo(() => {
+    if (!form.company) return [];
+
+    return stores
+      .filter((store) => store.company_name === form.company)
+      .filter((store) => (store.store_name || "").trim() !== "")
+      .sort((a, b) =>
+        (a.store_name || "").localeCompare(b.store_name || "", undefined, {
+          sensitivity: "base",
+        })
+      );
+  }, [stores, form.company]);
 
   function handleChange(
     event: React.ChangeEvent<
@@ -36,22 +97,28 @@ export default function ClientPortalPage() {
     setForm((prev) => ({
       ...prev,
       [name]: value,
+      ...(name === "company" ? { store: "" } : {}),
     }));
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-  
+
     if (!form.company || !form.store || !form.description) {
       alert("Please fill Company, Store and Description.");
       return;
     }
-  
+
+    const selectedStore = stores.find(
+      (store) =>
+        store.company_name === form.company && store.store_name === form.store
+    );
+
     const taskPayload = {
       store: form.store,
       company_name: form.company,
-      location: "",
-      store_id: null,
+      location: selectedStore?.location || "",
+      store_id: selectedStore?.id || null,
       issue: form.description,
       status: "Open",
       category: form.category,
@@ -62,27 +129,27 @@ export default function ClientPortalPage() {
       technician: "",
       created_by: `Client Portal - ${form.contactPerson} - ${form.phone}`,
     };
-  
+
     try {
-        const response = await fetch("/api/tasks/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(taskPayload),
-        });
-      
-        if (!response.ok) {
-          throw new Error("Failed to create task");
-        }
-      } catch (error) {
-        console.error(error);
-        alert("Error while submitting request.");
-        return;
+      const response = await fetch("/api/tasks/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(taskPayload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create task");
       }
-  
+    } catch (error) {
+      console.error(error);
+      alert("Error while submitting request.");
+      return;
+    }
+
     alert("Request submitted successfully.");
-  
+
     setForm({
       company: "",
       store: "",
@@ -113,26 +180,47 @@ export default function ClientPortalPage() {
           <div style={gridStyle}>
             <div>
               <label style={labelStyle}>Company</label>
-              <input
+              <select
                 name="company"
                 value={form.company}
                 onChange={handleChange}
                 required
-                placeholder="Example: Inditex Azerbaijan"
                 style={inputStyle}
-              />
+              >
+                <option value="">Select company</option>
+                {companies.map((company) => (
+                  <option key={company} value={company}>
+                    {company}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label style={labelStyle}>Store</label>
-              <input
+              <select
                 name="store"
                 value={form.store}
                 onChange={handleChange}
                 required
-                placeholder="Example: Zara Ganjlik Mall"
-                style={inputStyle}
-              />
+                disabled={!form.company}
+                style={{
+                  ...inputStyle,
+                  background: form.company ? "#ffffff" : "#f9fafb",
+                  cursor: form.company ? "pointer" : "not-allowed",
+                }}
+              >
+                <option value="">
+                  {form.company ? "Select store" : "Select company first"}
+                </option>
+
+                {filteredStores.map((store) => (
+                  <option key={store.id} value={store.store_name || ""}>
+                    {store.store_name}
+                    {store.location ? ` — ${store.location}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
