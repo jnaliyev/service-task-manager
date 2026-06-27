@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createTask } from "@/lib/tasks/createTask";
 
 type ClientRequestForm = {
   company: string;
@@ -13,10 +13,7 @@ type ClientRequestForm = {
   description: string;
 };
 
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+
 
 export default function ClientPortalPage() {
   const [form, setForm] = useState<ClientRequestForm>({
@@ -66,15 +63,13 @@ export default function ClientPortalPage() {
       created_by: `Client Portal - ${form.contactPerson} - ${form.phone}`,
     };
   
-    const { error } = await supabase
-      .from("tasks")
-      .insert([taskPayload]);
-  
-    if (error) {
-      console.error(error);
-      alert("Error while submitting request.");
-      return;
-    }
+    try {
+        await createTask(taskPayload);
+      } catch (error) {
+        console.error(error);
+        alert("Error while submitting request.");
+        return;
+      }
   
     alert("Request submitted successfully.");
   
