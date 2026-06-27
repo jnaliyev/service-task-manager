@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import TaskMobileCard from "../components/TaskMobileCard";
 import TaskTable from "../components/TaskTable";
 import TaskForm from "../components/TaskForm";
+import AIAnalysisCard from "../components/AIAnalysisCard";
 
 type Employee = {
   id: string;
@@ -46,6 +47,10 @@ created_by?: string;
     location: string;
   };
   attachments?: string[] | string | null;
+  ai_category?: string | null;
+  ai_priority?: string | null;
+  ai_summary?: string | null;
+  ai_confidence?: number | null;
 };
 type Comment = {
   id: string;
@@ -247,6 +252,93 @@ function TaskAttachmentsModal({
   );
 }
 
+function TaskAiAnalysisModal({
+  task,
+  darkMode,
+  onClose,
+}: {
+  task: Task;
+  darkMode: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: darkMode ? "#1f2937" : "white",
+          color: darkMode ? "#f9fafb" : "#111827",
+          width: "100%",
+          maxWidth: "720px",
+          maxHeight: "90vh",
+          overflow: "auto",
+          borderRadius: "16px",
+          padding: "24px",
+          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.2)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "20px",
+          }}
+        >
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "10px",
+              background: "#eff6ff",
+              color: "#2563eb",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "18px",
+              flexShrink: 0,
+            }}
+            aria-hidden="true"
+          >
+            🤖
+          </div>
+          <h2 style={{ margin: 0 }}>AI Analysis</h2>
+        </div>
+
+        <AIAnalysisCard
+          ai_category={task.ai_category}
+          ai_priority={task.ai_priority}
+          ai_summary={task.ai_summary}
+          ai_confidence={task.ai_confidence}
+          embedded
+        />
+
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            ...buttonStyle,
+            marginTop: "24px",
+            width: "100%",
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TaskActionsDropdown({
   task,
   darkMode,
@@ -256,8 +348,10 @@ function TaskActionsDropdown({
   showEdit,
   showDelete,
   showPhotos,
+  showAiAnalysis,
   onComments,
   onPhotos,
+  onAiAnalysis,
   onEdit,
   onDelete,
   onUploadPhoto,
@@ -270,8 +364,10 @@ function TaskActionsDropdown({
   showEdit: boolean;
   showDelete: boolean;
   showPhotos: boolean;
+  showAiAnalysis: boolean;
   onComments: () => void;
   onPhotos: () => void;
+  onAiAnalysis: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onUploadPhoto: (file: File) => Promise<void>;
@@ -385,6 +481,7 @@ Created By: ${task.created_by || "Retail Systems"}`
         <div style={menuStyle}>
           {renderMenuItem("Comments", onComments)}
           {showPhotos && renderMenuItem("Photos", onPhotos)}
+          {showAiAnalysis && renderMenuItem("AI Analysis", onAiAnalysis)}
           {showEdit && renderMenuItem("Edit", onEdit)}
           {renderMenuItem("WhatsApp", () => {}, {
             isLink: true,
@@ -448,6 +545,7 @@ const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 const [editingTask, setEditingTask] = useState<Task | null>(null);
 const [attachmentsModalTask, setAttachmentsModalTask] = useState<Task | null>(null);
+const [aiAnalysisModalTask, setAiAnalysisModalTask] = useState<Task | null>(null);
 const [openActionsTaskId, setOpenActionsTaskId] = useState<number | null>(null);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -2940,6 +3038,7 @@ photos={photos}
         showEdit={isAdmin || isGeneral || isManager}
         showDelete={currentEmployee?.role?.toLowerCase() === "admin"}
         showPhotos={getTaskAttachmentUrls(task.attachments).length > 0}
+        showAiAnalysis={Boolean(task.ai_summary?.trim())}
         onComments={() => {
           setSelectedTask(task);
           setSelectedTaskId(task.id.toString());
@@ -2948,6 +3047,7 @@ photos={photos}
           setSelectedPhotoTaskId(task.id);
         }}
         onPhotos={() => setAttachmentsModalTask(task)}
+        onAiAnalysis={() => setAiAnalysisModalTask(task)}
         onEdit={() => {
           setEditingTask(task);
           setShowForm(true);
@@ -3120,6 +3220,14 @@ color: darkMode ? "#f9fafb" : "#111827",
     task={attachmentsModalTask}
     darkMode={darkMode}
     onClose={() => setAttachmentsModalTask(null)}
+  />
+)}
+
+{aiAnalysisModalTask && (
+  <TaskAiAnalysisModal
+    task={aiAnalysisModalTask}
+    darkMode={darkMode}
+    onClose={() => setAiAnalysisModalTask(null)}
   />
 )}
 

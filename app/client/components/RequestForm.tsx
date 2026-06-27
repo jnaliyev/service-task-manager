@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import type { ClientPortalConfig } from "@/app/client/types/portal";
 import CompanySelect from "./CompanySelect";
 import StoreSelect from "./StoreSelect";
 
@@ -63,14 +64,103 @@ async function uploadSelectedPhotos(files: File[]): Promise<string[]> {
   return uploadedUrls;
 }
 
+function runBackgroundAiAnalysis({
+  taskId,
+  issue,
+  category,
+  priority,
+  attachments,
+}: {
+  taskId: number;
+  issue: string;
+  category: string;
+  priority: string;
+  attachments: string[];
+}) {
+  void (async () => {
+    try {
+      const analyzeResponse = await fetch("/api/ai/analyze-task", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          issue,
+          category,
+          priority,
+          attachments,
+        }),
+      });
+
+      if (!analyzeResponse.ok) {
+        console.error(
+          "Background AI analysis failed:",
+          await analyzeResponse.text()
+        );
+        return;
+      }
+
+      const aiResult = await analyzeResponse.json();
+
+      const updateResponse = await fetch("/api/tasks/update-ai", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          task_id: taskId,
+          ai_category: aiResult.ai_category,
+          ai_priority: aiResult.ai_priority,
+          ai_summary: aiResult.ai_summary,
+          ai_confidence: aiResult.ai_confidence,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        console.error(
+          "Background AI save failed:",
+          await updateResponse.text()
+        );
+      }
+    } catch (error) {
+      console.error("Background AI analysis error:", error);
+    }
+  })();
+}
+
 type RequestFormProps = {
   stores: Store[];
   onSuccess: (requestNumber: string) => void;
+  portalConfig?: ClientPortalConfig | null;
 };
 
-export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
-  const [form, setForm] = useState<ClientRequestForm>(initialFormState);
+function createInitialFormState(portalConfig?: ClientPortalConfig | null): ClientRequestForm {
+  if (portalConfig) {
+    return {
+      ...initialFormState,
+      company: portalConfig.companyName,
+    };
+  }
+
+  return initialFormState;
+}
+
+export default function RequestForm({
+  stores,
+  onSuccess,
+  portalConfig = null,
+}: RequestFormProps) {
+  const isPortalMode = Boolean(portalConfig);
+  const [form, setForm] = useState<ClientRequestForm>(() =>
+    createInitialFormState(portalConfig)
+  );
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+
+  useEffect(() => {
+    if (!portalConfig) return;
+
+    setForm(createInitialFormState(portalConfig));
+  }, [portalConfig]);
 
   const companies = useMemo(() => {
     const uniqueCompanies = new Set<string>();
@@ -89,17 +179,19 @@ export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
   }, [stores]);
 
   const filteredStores = useMemo(() => {
-    if (!form.company) return [];
+    const companyName = portalConfig?.companyName || form.company;
+
+    if (!companyName) return [];
 
     return stores
-      .filter((store) => store.company_name === form.company)
+      .filter((store) => store.company_name === companyName)
       .filter((store) => (store.store_name || "").trim() !== "")
       .sort((a, b) =>
         (a.store_name || "").localeCompare(b.store_name || "", undefined, {
           sensitivity: "base",
         })
       );
-  }, [stores, form.company]);
+  }, [stores, form.company, portalConfig?.companyName]);
 
   function handleChange(
     event: React.ChangeEvent<
@@ -134,14 +226,21 @@ export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!form.company || !form.store || !form.description) {
-      alert("Please fill Company, Store and Description.");
+    const companyName = portalConfig?.companyName || form.company;
+    const storeName = form.store;
+
+    if (!companyName || !storeName || !form.description) {
+      alert(
+        isPortalMode
+          ? "Please fill Store and Description."
+          : "Please fill Company, Store and Description."
+      );
       return;
     }
 
     const selectedStore = stores.find(
       (store) =>
-        store.company_name === form.company && store.store_name === form.store
+        store.company_name === companyName && store.store_name === storeName
     );
 
     let attachments: string[] = [];
@@ -157,8 +256,8 @@ export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
     }
 
     const taskPayload = {
-      store: form.store,
-      company_name: form.company,
+      store: storeName,
+      company_name: companyName,
       location: selectedStore?.location || "",
       store_id: selectedStore?.id || null,
       issue: form.description,
@@ -189,11 +288,18 @@ export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
       const result = await response.json();
 
       console.log(result);
+      runBackgroundAiAnalysis({
+        taskId: result.task.id,
+        issue: form.description,
+        category: form.category,
+        priority: form.priority,
+        attachments,
+      });
       onSuccess(
         `RS-${new Date().getFullYear()}-${String(result.task.id).padStart(6, "0")}`
       );
 
-      setForm(initialFormState);
+      setForm(createInitialFormState(portalConfig));
       setSelectedPhotos([]);
     } catch (error) {
       console.error(error);
@@ -215,21 +321,60 @@ export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
           <h1 style={titleStyle}>Maintenance Portal</h1>
 
           <p style={subtitleStyle}>
-            Submit a maintenance request and our team will review it shortly.
+            {isPortalMode
+              ? `Submit a maintenance request for ${portalConfig?.companyName}.`
+              : "Submit a maintenance request and our team will review it shortly."}
           </p>
         </div>
 
+        {isPortalMode && (
+          <div
+            style={{
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb",
+              borderRadius: "14px",
+              padding: "16px",
+              marginBottom: "18px",
+            }}
+          >
+            <p
+              style={{
+                margin: "0 0 6px",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#6b7280",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Company
+            </p>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "#111827",
+              }}
+            >
+              {portalConfig?.companyName}
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={formStyle}>
           <div style={gridStyle}>
-            <CompanySelect
-              companies={companies}
-              value={form.company}
-              onChange={handleChange}
-            />
+            {!isPortalMode && (
+              <CompanySelect
+                companies={companies}
+                value={form.company}
+                onChange={handleChange}
+              />
+            )}
 
             <StoreSelect
               filteredStores={filteredStores}
-              company={form.company}
+              company={portalConfig?.companyName || form.company}
               value={form.store}
               onChange={handleChange}
             />
