@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 type ClientRequestForm = {
   company: string;
@@ -11,6 +12,11 @@ type ClientRequestForm = {
   priority: string;
   description: string;
 };
+
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
 export default function ClientPortalPage() {
   const [form, setForm] = useState<ClientRequestForm>({
@@ -36,12 +42,51 @@ export default function ClientPortalPage() {
     }));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    console.log("Client Portal Request:", form);
-
+  
+    if (!form.company || !form.store || !form.description) {
+      alert("Please fill Company, Store and Description.");
+      return;
+    }
+  
+    const taskPayload = {
+      store: form.store,
+      company_name: form.company,
+      location: "",
+      store_id: null,
+      issue: form.description,
+      status: "Open",
+      category: form.category,
+      department: form.category,
+      priority: form.priority,
+      due_date: null,
+      employee_id: null,
+      technician: "",
+      created_by: `Client Portal - ${form.contactPerson} - ${form.phone}`,
+    };
+  
+    const { error } = await supabase
+      .from("tasks")
+      .insert([taskPayload]);
+  
+    if (error) {
+      console.error(error);
+      alert("Error while submitting request.");
+      return;
+    }
+  
     alert("Request submitted successfully.");
+  
+    setForm({
+      company: "",
+      store: "",
+      contactPerson: "",
+      phone: "",
+      category: "",
+      priority: "Normal",
+      description: "",
+    });
   }
 
   return (
