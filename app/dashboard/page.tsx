@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 import TaskMobileCard from "../components/TaskMobileCard";
@@ -45,6 +45,7 @@ created_by?: string;
     store_name: string;
     location: string;
   };
+  attachments?: string[] | string | null;
 };
 type Comment = {
   id: string;
@@ -65,6 +66,376 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+function getTaskAttachmentUrls(
+  attachments: string[] | string | null | undefined
+): string[] {
+  if (!attachments) return [];
+
+  if (Array.isArray(attachments)) {
+    return attachments.filter(
+      (url): url is string => typeof url === "string" && url.trim() !== ""
+    );
+  }
+
+  if (typeof attachments === "string") {
+    try {
+      const parsed = JSON.parse(attachments);
+
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (url): url is string => typeof url === "string" && url.trim() !== ""
+        );
+      }
+    } catch {
+      return attachments.trim() ? [attachments] : [];
+    }
+  }
+
+  return [];
+}
+
+function TaskAttachmentsPanel({
+  attachments,
+  darkMode,
+}: {
+  attachments: string[] | string | null | undefined;
+  darkMode: boolean;
+}) {
+  const attachmentUrls = getTaskAttachmentUrls(attachments);
+
+  if (attachmentUrls.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        background: darkMode ? "#1f2937" : "white",
+        color: darkMode ? "#f9fafb" : "#111827",
+        padding: "20px",
+        borderRadius: "14px",
+        marginBottom: "20px",
+      }}
+    >
+      <h3 style={{ margin: "0 0 12px" }}>Attachments</h3>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "8px",
+        }}
+      >
+        {attachmentUrls.map((url, index) => (
+          <a
+            key={`${url}-${index}`}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "block", lineHeight: 0 }}
+          >
+            <img
+              src={url}
+              alt={`Attachment ${index + 1}`}
+              style={{
+                width: "120px",
+                height: "120px",
+                objectFit: "contain",
+                borderRadius: "10px",
+                border: "1px solid #e5e7eb",
+                background: darkMode ? "#374151" : "#f9fafb",
+              }}
+            />
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaskAttachmentsModal({
+  task,
+  darkMode,
+  onClose,
+}: {
+  task: Task;
+  darkMode: boolean;
+  onClose: () => void;
+}) {
+  const attachmentUrls = getTaskAttachmentUrls(task.attachments);
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: darkMode ? "#1f2937" : "white",
+          color: darkMode ? "#f9fafb" : "#111827",
+          width: "100%",
+          maxWidth: "720px",
+          maxHeight: "90vh",
+          overflow: "auto",
+          borderRadius: "16px",
+          padding: "24px",
+          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.2)",
+        }}
+      >
+        <h2 style={{ margin: "0 0 8px" }}>Photos</h2>
+        <p
+          style={{
+            margin: "0 0 20px",
+            color: darkMode ? "#cbd5e1" : "#6b7280",
+            fontSize: "14px",
+          }}
+        >
+          {task.stores
+            ? `${task.stores.company_name} / ${task.stores.store_name}`
+            : task.store}
+        </p>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+            gap: "12px",
+          }}
+        >
+          {attachmentUrls.map((url, index) => (
+            <a
+              key={`${url}-${index}`}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "block", lineHeight: 0 }}
+            >
+              <img
+                src={url}
+                alt={`Attachment ${index + 1}`}
+                style={{
+                  width: "100%",
+                  aspectRatio: "1 / 1",
+                  objectFit: "contain",
+                  borderRadius: "10px",
+                  border: "1px solid #e5e7eb",
+                  background: darkMode ? "#374151" : "#f9fafb",
+                }}
+              />
+            </a>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            ...buttonStyle,
+            marginTop: "24px",
+            width: "100%",
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TaskActionsDropdown({
+  task,
+  darkMode,
+  isOpen,
+  onToggle,
+  onClose,
+  showEdit,
+  showDelete,
+  showPhotos,
+  onComments,
+  onPhotos,
+  onEdit,
+  onDelete,
+  onUploadPhoto,
+}: {
+  task: Task;
+  darkMode: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  showEdit: boolean;
+  showDelete: boolean;
+  showPhotos: boolean;
+  onComments: () => void;
+  onPhotos: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onUploadPhoto: (file: File) => Promise<void>;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const whatsAppUrl = `https://wa.me/?text=${encodeURIComponent(
+    `Task: ${task.issue}
+
+Store: ${task.store}
+
+Status: ${task.status}
+
+Assigned To: ${task.technician || "Not Assigned"}
+
+Created By: ${task.created_by || "Retail Systems"}`
+  )}`;
+
+  const menuStyle: React.CSSProperties = {
+    position: "absolute",
+    top: "calc(100% + 6px)",
+    right: 0,
+    minWidth: "168px",
+    background: darkMode ? "#1f2937" : "white",
+    border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
+    borderRadius: "10px",
+    boxShadow: "0 10px 25px rgba(15, 23, 42, 0.15)",
+    overflow: "hidden",
+    zIndex: 20,
+  };
+
+  const menuItemStyle: React.CSSProperties = {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    padding: "10px 14px",
+    border: "none",
+    background: "transparent",
+    color: darkMode ? "#f9fafb" : "#111827",
+    fontSize: "14px",
+    fontWeight: 500,
+    cursor: "pointer",
+    textDecoration: "none",
+    boxSizing: "border-box",
+  };
+
+  const menuDividerStyle: React.CSSProperties = {
+    borderBottom: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
+  };
+
+  function renderMenuItem(
+    label: string,
+    onClick: () => void,
+    options?: { destructive?: boolean; isLink?: boolean; href?: string }
+  ) {
+    const style: React.CSSProperties = {
+      ...menuItemStyle,
+      ...(options?.destructive ? { color: "#dc2626" } : {}),
+    };
+
+    if (options?.isLink && options.href) {
+      return (
+        <a
+          key={label}
+          href={options.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ ...style, ...menuDividerStyle }}
+          onClick={onClose}
+        >
+          {label}
+        </a>
+      );
+    }
+
+    return (
+      <button
+        key={label}
+        type="button"
+        style={{ ...style, ...menuDividerStyle }}
+        onClick={() => {
+          onClick();
+          onClose();
+        }}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          background: darkMode ? "#334155" : "#111827",
+          color: "white",
+          padding: "8px 14px",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+          fontWeight: 600,
+          fontSize: "14px",
+        }}
+      >
+        Actions ▾
+      </button>
+
+      {isOpen && (
+        <div style={menuStyle}>
+          {renderMenuItem("Comments", onComments)}
+          {showPhotos && renderMenuItem("Photos", onPhotos)}
+          {showEdit && renderMenuItem("Edit", onEdit)}
+          {renderMenuItem("WhatsApp", () => {}, {
+            isLink: true,
+            href: whatsAppUrl,
+          })}
+          <button
+            type="button"
+            style={{ ...menuItemStyle, ...menuDividerStyle }}
+            onClick={() => {
+              onClose();
+              fileInputRef.current?.click();
+            }}
+          >
+            Upload Photo
+          </button>
+          {showDelete && (
+            <button
+              type="button"
+              style={{
+                ...menuItemStyle,
+                color: "#dc2626",
+              }}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        hidden
+        accept="image/*"
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+
+          if (!file) return;
+
+          await onUploadPhoto(file);
+          event.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   
@@ -76,6 +447,8 @@ const [commentText, setCommentText] = useState("");
 const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 const [editingTask, setEditingTask] = useState<Task | null>(null);
+const [attachmentsModalTask, setAttachmentsModalTask] = useState<Task | null>(null);
+const [openActionsTaskId, setOpenActionsTaskId] = useState<number | null>(null);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stores, setStores] = useState<any[]>([]);
@@ -2556,135 +2929,49 @@ photos={photos}
     : "-"}
 </td>
     <td style={tdStyle}>
-      <button
-        onClick={() => {
+      <TaskActionsDropdown
+        task={task}
+        darkMode={darkMode}
+        isOpen={openActionsTaskId === task.id}
+        onToggle={() =>
+          setOpenActionsTaskId((prev) => (prev === task.id ? null : task.id))
+        }
+        onClose={() => setOpenActionsTaskId(null)}
+        showEdit={isAdmin || isGeneral || isManager}
+        showDelete={currentEmployee?.role?.toLowerCase() === "admin"}
+        showPhotos={getTaskAttachmentUrls(task.attachments).length > 0}
+        onComments={() => {
           setSelectedTask(task);
-
           setSelectedTaskId(task.id.toString());
-        
           loadComments(task.id);
           loadPhotos(task.id);
-        
           setSelectedPhotoTaskId(task.id);
         }}
-        style={{
-          background: "#2563eb",
-          color: "white",
-          padding: "8px 14px",
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer",
-          marginRight: "10px",
+        onPhotos={() => setAttachmentsModalTask(task)}
+        onEdit={() => {
+          setEditingTask(task);
+          setShowForm(true);
+          setNewTask({
+            store_id: task.store_id ? String(task.store_id) : "",
+            store: task.store || "",
+            issue: task.issue || "",
+            employee_id: task.employee_id || "",
+            additional_employee_ids: [],
+            status: task.status || "Open",
+            category: task.category || task.department || "General",
+            priority: task.priority || "Medium",
+            due_date: task.due_date || "",
+            company_name: task.stores?.company_name || "",
+            location: task.stores?.location || "",
+          });
         }}
-      >
-        Comments
-        </button>
-        {(isAdmin || isGeneral || isManager) && (
-  <button
-    onClick={() => {
-      setEditingTask(task);
-
-      setShowForm(true);
-
-      setNewTask({
-        store_id: task.store_id ? String(task.store_id) : "",
-        store: task.store || "",
-        issue: task.issue || "",
-        employee_id: task.employee_id || "",
-        additional_employee_ids: [],
-        status: task.status || "Open",
-        category: task.category || task.department || "General",
-        priority: task.priority || "Medium",
-        due_date: task.due_date || "",
-        company_name: task.stores?.company_name || "",
-        location: task.stores?.location || "",
-      });
-    }}
-    style={{
-      background: "#7c3aed",
-      color: "white",
-      padding: "8px 14px",
-      border: "none",
-      borderRadius: "8px",
-      cursor: "pointer",
-      marginRight: "10px",
-    }}
-  >
-    Edit
-  </button>
-)}
-        <a
-  href={`https://wa.me/?text=${encodeURIComponent(
-   `Task: ${task.issue}
-
-Store: ${task.store}
-
-Status: ${task.status}
-
-Assigned To: ${task.technician || "Not Assigned"}
-
-Created By: ${task.created_by || "Retail Systems"}`
-  )}`}
-  target="_blank"
-  style={{
-    background: "#25D366",
-    color: "white",
-    padding: "8px 14px",
-    borderRadius: "8px",
-    textDecoration: "none",
-    marginRight: "10px",
-    display: "inline-block",
-  }}
->
-  WhatsApp
-</a>
-
-      <label
-  style={{
-    background: "#16a34a",
-    color: "white",
-    padding: "8px 14px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    marginRight: "10px",
-    display: "inline-block",
-whiteSpace: "nowrap",
-  }}
->
-  Upload Photo
-
-  <input
-    type="file"
-    hidden
-    accept="image/*"
-    onChange={async (e) => {
-      const file = e.target.files?.[0];
-
-      if (!file) return;
-
-      await uploadPhoto(task.id, file);
-
-      setSelectedPhotoTaskId(task.id);
-
-      loadPhotos(task.id);
-    }}
-  />
-</label>
-{currentEmployee?.role?.toLowerCase() === "admin" && (
-        <button
-          onClick={() => deleteTask(task.id)}
-          style={{
-            background: "#dc2626",
-            color: "white",
-            padding: "8px 14px",
-            border: "none",
-            borderRadius: "8px",
-            cursor: "pointer",
-          }}
-        >
-          Delete
-        </button>
-      )}
+        onDelete={() => deleteTask(task.id)}
+        onUploadPhoto={async (file) => {
+          await uploadPhoto(task.id, file);
+          setSelectedPhotoTaskId(task.id);
+          loadPhotos(task.id);
+        }}
+      />
     </td>
   </tr>
 ))}
@@ -2743,6 +3030,13 @@ whiteSpace: "nowrap",
         <p><strong>Status:</strong> {selectedTask.status}</p>
         <p><strong>Assigned To:</strong> {selectedTask.technician}</p>
       </div>
+    )}
+
+    {selectedTask && (
+      <TaskAttachmentsPanel
+        attachments={selectedTask.attachments}
+        darkMode={darkMode}
+      />
     )}
 
     <div
@@ -2819,6 +3113,14 @@ color: darkMode ? "#f9fafb" : "#111827",
       </div>
     </div>
   </div>
+)}
+
+{attachmentsModalTask && (
+  <TaskAttachmentsModal
+    task={attachmentsModalTask}
+    darkMode={darkMode}
+    onClose={() => setAttachmentsModalTask(null)}
+  />
 )}
 
 </main>
