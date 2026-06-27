@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 import CompanySelect from "./CompanySelect";
 import StoreSelect from "./StoreSelect";
 
@@ -33,6 +34,34 @@ const initialFormState: ClientRequestForm = {
 };
 
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ATTACHMENTS_BUCKET = "client-attachments";
+
+async function uploadSelectedPhotos(files: File[]): Promise<string[]> {
+  const uploadedUrls: string[] = [];
+
+  for (const file of files) {
+    const filePath = `client-requests/${Date.now()}-${file.name}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .upload(filePath, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from(ATTACHMENTS_BUCKET)
+      .getPublicUrl(filePath);
+
+    uploadedUrls.push(data.publicUrl);
+  }
+
+  return uploadedUrls;
+}
 
 type RequestFormProps = {
   stores: Store[];
@@ -115,6 +144,18 @@ export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
         store.company_name === form.company && store.store_name === form.store
     );
 
+    let attachments: string[] = [];
+
+    if (selectedPhotos.length > 0) {
+      try {
+        attachments = await uploadSelectedPhotos(selectedPhotos);
+      } catch (error) {
+        console.error("Photo upload error:", error);
+        alert("Failed to upload photos. Please try again.");
+        return;
+      }
+    }
+
     const taskPayload = {
       store: form.store,
       company_name: form.company,
@@ -129,6 +170,7 @@ export default function RequestForm({ stores, onSuccess }: RequestFormProps) {
       employee_id: null,
       technician: "",
       created_by: `Client Portal - ${form.contactPerson} - ${form.phone}`,
+      attachments,
     };
 
     try {
