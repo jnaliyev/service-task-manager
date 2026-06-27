@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createTask } from "@/lib/tasks/createTask";
+
 
 type ClientRequestForm = {
   company: string;
@@ -64,7 +64,17 @@ export default function ClientPortalPage() {
     };
   
     try {
-        await createTask(taskPayload);
+        const response = await fetch("/api/tasks/create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(taskPayload),
+        });
+      
+        if (!response.ok) {
+          throw new Error("Failed to create task");
+        }
       } catch (error) {
         console.error(error);
         alert("Error while submitting request.");
