@@ -1,3 +1,5 @@
+import type { Store } from "@/app/client/types/store";
+
 export type ClientPortalRecord = {
   id: string;
   slug: string;
@@ -15,7 +17,7 @@ export type ClientPortalConfig = {
 
 export type ClientPortalApiResponse = {
   portal: ClientPortalConfig;
-  stores: import("@/app/client/components/RequestForm").Store[];
+  stores: Store[];
 };
 
 export type ClientPortalApiError = {

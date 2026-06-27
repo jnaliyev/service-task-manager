@@ -27,6 +27,7 @@ export async function POST(request: Request) {
 
     const data = await updateTaskAi(taskId, {
       ai_category: payload.ai_category,
+      ai_department: payload.ai_department,
       ai_priority: payload.ai_priority,
       ai_summary: payload.ai_summary,
       ai_confidence: Number(payload.ai_confidence),

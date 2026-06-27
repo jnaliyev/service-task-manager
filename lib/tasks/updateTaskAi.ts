@@ -7,6 +7,7 @@ const supabase = createClient(
 
 export type UpdateTaskAiPayload = {
   ai_category: string;
+  ai_department?: string;
   ai_priority: string;
   ai_summary: string;
   ai_confidence: number;
@@ -20,6 +21,7 @@ export async function updateTaskAi(
     .from("tasks")
     .update({
       ai_category: payload.ai_category,
+      ai_department: payload.ai_department,
       ai_priority: payload.ai_priority,
       ai_summary: payload.ai_summary,
       ai_confidence: payload.ai_confidence,

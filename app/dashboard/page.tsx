@@ -1,12 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 import TaskMobileCard from "../components/TaskMobileCard";
 import TaskTable from "../components/TaskTable";
 import TaskForm from "../components/TaskForm";
 import AIAnalysisCard from "../components/AIAnalysisCard";
+import NotificationBell from "./components/NotificationBell";
+import ClientRequestToast from "./components/ClientRequestToast";
+import ErpMessageToast from "./components/ErpMessageToast";
+import TaskMessagesPanel, {
+  subscribeToClientMessageNotifications,
+} from "./components/TaskMessagesPanel";
+import { useClientRequestRealtime } from "./hooks/useClientRequestRealtime";
+import type { ClientRequestNotification } from "./hooks/useClientRequestRealtime";
+import "./dashboard-realtime.css";
+import {
+  playNotificationSound,
+  unlockNotificationSound,
+} from "@/lib/notifications/playNotificationSound";
 
 type Employee = {
   id: string;
@@ -47,7 +60,9 @@ created_by?: string;
     location: string;
   };
   attachments?: string[] | string | null;
+  client_description?: string | null;
   ai_category?: string | null;
+  ai_department?: string | null;
   ai_priority?: string | null;
   ai_summary?: string | null;
   ai_confidence?: number | null;
@@ -70,6 +85,34 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+function getTableRowBackground(
+  task: Task,
+  isHighlighted: boolean,
+  darkMode: boolean
+) {
+  if (isHighlighted && !darkMode) {
+    return "#bbf7d0";
+  }
+
+  if (darkMode) {
+    return "#1e293b";
+  }
+
+  if (task.status === "Completed") {
+    return "#ecfdf5";
+  }
+
+  if (task.priority === "Urgent" || task.priority === "Critical") {
+    return "#fee2e2";
+  }
+
+  if (task.priority === "High") {
+    return "#fff7ed";
+  }
+
+  return "white";
+}
 
 function getTaskAttachmentUrls(
   attachments: string[] | string | null | undefined
@@ -317,9 +360,11 @@ function TaskAiAnalysisModal({
 
         <AIAnalysisCard
           ai_category={task.ai_category}
+          ai_department={task.ai_department}
           ai_priority={task.ai_priority}
           ai_summary={task.ai_summary}
           ai_confidence={task.ai_confidence}
+          client_description={task.client_description}
           embedded
         />
 
@@ -547,6 +592,14 @@ const [editingTask, setEditingTask] = useState<Task | null>(null);
 const [attachmentsModalTask, setAttachmentsModalTask] = useState<Task | null>(null);
 const [aiAnalysisModalTask, setAiAnalysisModalTask] = useState<Task | null>(null);
 const [openActionsTaskId, setOpenActionsTaskId] = useState<number | null>(null);
+const [erpMessageToast, setErpMessageToast] = useState<{
+  taskId: number;
+  senderName: string;
+  preview: string;
+} | null>(null);
+const [messageUnreadByTask, setMessageUnreadByTask] = useState<
+  Record<number, number>
+>({});
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stores, setStores] = useState<any[]>([]);
@@ -554,9 +607,121 @@ const [openActionsTaskId, setOpenActionsTaskId] = useState<number | null>(null);
   const isAdmin = currentEmployee?.role?.toLowerCase() === "admin";
 const isGeneral = currentEmployee?.role?.toLowerCase() === "general";
 const isTechnician = currentEmployee?.role?.toLowerCase() === "technician";
-  const isManager = currentEmployee?.role?.toLowerCase() === "manager";
+const isManager = currentEmployee?.role?.toLowerCase() === "manager";
+const canUseTaskMessages = Boolean(isAdmin || isGeneral || isManager);
 const isInventory = currentEmployee?.role === "Inventory";
 const isViewer = currentEmployee?.role === "Viewer";
+
+  const fetchTaskById = useCallback(async (taskId: number) => {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select(`
+        *,
+        employees(full_name, role),
+        task_assignments(
+          employee_id,
+          employees(full_name)
+        )
+      `)
+      .eq("id", taskId)
+      .single();
+
+    if (error) {
+      console.error(error);
+      return null;
+    }
+
+    return data as Task;
+  }, []);
+
+  const receiveRealtimeTask = useCallback((task: Task) => {
+    setTasks((prev) => {
+      if (prev.some((item) => item.id === task.id)) {
+        return prev;
+      }
+
+      return [task, ...prev];
+    });
+  }, []);
+
+  const {
+    notifications,
+    unreadCount,
+    activeToast,
+    highlightedTaskIds,
+    isPanelOpen,
+    openPanel,
+    closePanel,
+    dismissToast,
+    dismissNotification,
+    openNotificationTask,
+    highlightTask,
+  } = useClientRequestRealtime({
+    enabled: Boolean(isAdmin || isGeneral),
+    supabase,
+    fetchTaskById,
+    onTaskReceived: receiveRealtimeTask,
+  });
+
+  const handleErpMessageUnreadChange = useCallback(
+    (taskId: number, count: number) => {
+      setMessageUnreadByTask((current) => ({
+        ...current,
+        [taskId]: count,
+      }));
+    },
+    []
+  );
+
+  const handleOpenTaskFromMessage = useCallback((taskId: number) => {
+    setSelectedTaskId(String(taskId));
+    setErpMessageToast(null);
+    setMessageUnreadByTask((current) => ({
+      ...current,
+      [taskId]: 0,
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (!canUseTaskMessages) return;
+
+    return subscribeToClientMessageNotifications(
+      supabase,
+      true,
+      selectedTaskId,
+      (message) => {
+        setMessageUnreadByTask((current) => ({
+          ...current,
+          [message.task_id]: (current[message.task_id] || 0) + 1,
+        }));
+        setErpMessageToast({
+          taskId: message.task_id,
+          senderName: message.sender_name,
+          preview: message.body,
+        });
+        void playNotificationSound();
+      }
+    );
+  }, [canUseTaskMessages, selectedTaskId]);
+
+  useEffect(() => {
+    let unlocked = false;
+
+    function unlockAudio() {
+      if (unlocked) return;
+      unlocked = true;
+      void unlockNotificationSound();
+    }
+
+    window.addEventListener("click", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
+
+    return () => {
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
+
 const kpiTasks =
   isAdmin || isGeneral
     ? tasks
@@ -784,6 +949,59 @@ const paginatedTasks = filteredTasks.slice(
   (currentPage - 1) * tasksPerPage,
   currentPage * tasksPerPage
 );
+
+  const handleOpenTaskFromNotification = useCallback(
+    async (notification: ClientRequestNotification) => {
+      const taskId = openNotificationTask(notification);
+      console.log("[notification open task] clicked:", taskId);
+      dismissToast();
+      closePanel();
+
+      let task = tasks.find((item) => item.id === taskId) || null;
+
+      if (!task) {
+        task = await fetchTaskById(taskId);
+        if (task) {
+          receiveRealtimeTask(task);
+        }
+      }
+
+      highlightTask(taskId);
+
+      const taskIndex = filteredTasks.findIndex((item) => item.id === taskId);
+      if (taskIndex >= 0) {
+        const targetPage = Math.floor(taskIndex / tasksPerPage) + 1;
+        if (targetPage !== currentPage) {
+          setCurrentPage(targetPage);
+        }
+      }
+
+      window.setTimeout(() => {
+        const element = document.querySelector(`[data-task-id="${taskId}"]`);
+        console.log("[notification open task] found row:", !!element);
+        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+
+      if (!task) return;
+
+      setSelectedTask(task);
+      setSelectedTaskId(String(taskId));
+      loadComments(taskId);
+      loadPhotos(taskId);
+      setSelectedPhotoTaskId(taskId);
+    },
+    [
+      closePanel,
+      currentPage,
+      dismissToast,
+      fetchTaskById,
+      filteredTasks,
+      highlightTask,
+      openNotificationTask,
+      receiveRealtimeTask,
+      tasks,
+    ]
+  );
 
   async function loadEmployees() {
     const { data, error } = await supabase
@@ -1378,6 +1596,19 @@ return (
   </div>
 </div>
 
+<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+  {(isAdmin || isGeneral) && (
+    <NotificationBell
+      notifications={notifications}
+      unreadCount={unreadCount}
+      isOpen={isPanelOpen}
+      onOpen={openPanel}
+      onClose={closePanel}
+      onOpenTask={handleOpenTaskFromNotification}
+      onDismiss={dismissNotification}
+    />
+  )}
+
   <button
     onClick={async () => {
       await supabase.auth.signOut();
@@ -1394,6 +1625,7 @@ return (
   >
     Logout
   </button>
+</div>
 </div>
 {currentEmployee && (
   <div
@@ -2824,7 +3056,9 @@ color: textColor,
       loadPhotos={loadPhotos}
       uploadPhoto={uploadPhoto}
       setSelectedPhotoTaskId={setSelectedPhotoTaskId}
-      highlightStyle={{}}
+      highlightStyle={{
+        background: highlightedTaskIds.has(task.id) ? "#bbf7d0" : "white",
+      }}
 updateStatus={updateStatus}
 currentEmployee={currentEmployee}
 photos={photos}
@@ -2926,6 +3160,7 @@ photos={photos}
               <th style={thStyle}>Store</th>
               <th style={thStyle}>Issue</th>
               <th style={thStyle}>Category</th>
+              <th style={thStyle}>Department</th>
               <th style={thStyle}>Priority</th>
               <th style={thStyle}>Due Date</th>
               <th style={thStyle}>Assigned To</th>
@@ -2939,16 +3174,16 @@ photos={photos}
           {paginatedTasks.map((task) => (
   <tr
   key={task.id}
+  data-task-id={task.id}
+  className={
+    highlightedTaskIds.has(task.id) ? "task-row-highlight" : undefined
+  }
   style={{
-    background: darkMode
-      ? "#1e293b"
-      : task.status === "Completed"
-      ? "#ecfdf5"
-      : task.priority === "Urgent"
-      ? "#fee2e2"
-      : task.priority === "High"
-      ? "#fff7ed"
-      : "white",
+    background: getTableRowBackground(
+      task,
+      highlightedTaskIds.has(task.id),
+      darkMode
+    ),
     color: darkMode ? "#f8fafc" : "#111827",
   }}
 >
@@ -2958,15 +3193,28 @@ photos={photos}
     color: darkMode ? "#f8fafc" : "#111827",
   }}
 >
-  <span style={{ color: darkMode ? "#f8fafc" : "#111827" }}>
-    {task.stores
-      ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
-      : task.store}
-  </span>
+  <div>
+    <div style={{ color: darkMode ? "#f8fafc" : "#111827" }}>
+      {task.store}
+    </div>
+    {(task.location || task.stores?.location) && (
+      <div
+        style={{
+          fontSize: "13px",
+          color: darkMode ? "#94a3b8" : "#6b7280",
+          marginTop: "4px",
+          lineHeight: 1.4,
+        }}
+      >
+        {task.location || task.stores?.location}
+      </div>
+    )}
+  </div>
 </td>
 
     <td style={tdStyle}>{task.issue}</td>
-    <td style={tdStyle}>{task.category || "General"}</td>
+    <td style={tdStyle}>{task.category || task.ai_category || "General"}</td>
+    <td style={tdStyle}>{task.department || task.ai_department || "-"}</td>
     <td style={{ ...tdStyle, color: getPriorityColor(task.priority || "Medium"), fontWeight: "bold" }}>
       {task.priority || "Medium"}
     </td>
@@ -3126,9 +3374,28 @@ photos={photos}
       >
         <h2>{selectedTask.store}</h2>
         <p><strong>Issue:</strong> {selectedTask.issue}</p>
+        {selectedTask.client_description?.trim() &&
+          selectedTask.client_description !== selectedTask.issue && (
+            <p><strong>Client Description:</strong> {selectedTask.client_description}</p>
+          )}
+        <p><strong>Category:</strong> {selectedTask.category || selectedTask.ai_category || "-"}</p>
+        <p><strong>Department:</strong> {selectedTask.department || selectedTask.ai_department || "-"}</p>
         <p><strong>Priority:</strong> {selectedTask.priority}</p>
         <p><strong>Status:</strong> {selectedTask.status}</p>
         <p><strong>Assigned To:</strong> {selectedTask.technician}</p>
+      </div>
+    )}
+
+    {selectedTask?.ai_summary?.trim() && (
+      <div style={{ marginBottom: "20px" }}>
+        <AIAnalysisCard
+          ai_category={selectedTask.ai_category}
+          ai_department={selectedTask.ai_department}
+          ai_priority={selectedTask.ai_priority}
+          ai_summary={selectedTask.ai_summary}
+          ai_confidence={selectedTask.ai_confidence}
+          client_description={selectedTask.client_description}
+        />
       </div>
     )}
 
@@ -3136,6 +3403,15 @@ photos={photos}
       <TaskAttachmentsPanel
         attachments={selectedTask.attachments}
         darkMode={darkMode}
+      />
+    )}
+
+    {canUseTaskMessages && selectedTask && selectedTaskId && (
+      <TaskMessagesPanel
+        taskId={Number(selectedTaskId)}
+        senderName={currentEmployee?.full_name || "ERP"}
+        darkMode={darkMode}
+        onUnreadChange={handleErpMessageUnreadChange}
       />
     )}
 
@@ -3231,6 +3507,24 @@ color: darkMode ? "#f9fafb" : "#111827",
   />
 )}
 
+{(isAdmin || isGeneral) && (
+  <ClientRequestToast
+    notification={activeToast}
+    onOpenTask={handleOpenTaskFromNotification}
+    onDismiss={dismissToast}
+  />
+)}
+
+{canUseTaskMessages && erpMessageToast && (
+  <ErpMessageToast
+    taskId={erpMessageToast.taskId}
+    senderName={erpMessageToast.senderName}
+    preview={erpMessageToast.preview}
+    onOpenTask={handleOpenTaskFromMessage}
+    onDismiss={() => setErpMessageToast(null)}
+  />
+)}
+
 </main>
   );
 }
@@ -3300,7 +3594,7 @@ function getStatusColor(status: string) {
 }
 
 function getPriorityColor(priority: string) {
-  if (priority === "Urgent") return "red";
+  if (priority === "Urgent" || priority === "Critical") return "red";
   if (priority === "High") return "orange";
   if (priority === "Medium") return "blue";
   return "green";

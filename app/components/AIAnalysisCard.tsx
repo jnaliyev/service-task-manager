@@ -1,8 +1,10 @@
 type AIAnalysisCardProps = {
   ai_category?: string | null;
+  ai_department?: string | null;
   ai_priority?: string | null;
   ai_summary?: string | null;
   ai_confidence?: number | null;
+  client_description?: string | null;
   embedded?: boolean;
 };
 
@@ -29,9 +31,11 @@ function getConfidenceBadgeStyle(confidence: number): React.CSSProperties {
 
 export default function AIAnalysisCard({
   ai_category,
+  ai_department,
   ai_priority,
   ai_summary,
   ai_confidence,
+  client_description,
   embedded = false,
 }: AIAnalysisCardProps) {
   if (!ai_summary?.trim()) return null;
@@ -92,10 +96,37 @@ export default function AIAnalysisCard({
         </div>
       )}
 
+      {client_description?.trim() && (
+        <div style={{ marginBottom: "16px" }}>
+          <p
+            style={{
+              margin: "0 0 8px",
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            Original Client Description
+          </p>
+          <p
+            style={{
+              margin: 0,
+              fontSize: "15px",
+              lineHeight: 1.6,
+              color: "#374151",
+            }}
+          >
+            {client_description}
+          </p>
+        </div>
+      )}
+
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
           gap: "14px",
           marginBottom: "16px",
         }}
@@ -122,6 +153,31 @@ export default function AIAnalysisCard({
             }}
           >
             {ai_category || "—"}
+          </p>
+        </div>
+
+        <div>
+          <p
+            style={{
+              margin: "0 0 6px",
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            Department
+          </p>
+          <p
+            style={{
+              margin: 0,
+              fontSize: "15px",
+              fontWeight: 600,
+              color: "#111827",
+            }}
+          >
+            {ai_department || "—"}
           </p>
         </div>
 
@@ -189,7 +245,7 @@ export default function AIAnalysisCard({
             letterSpacing: "0.06em",
           }}
         >
-          Summary
+          AI Summary (Azerbaijani)
         </p>
         <p
           style={{

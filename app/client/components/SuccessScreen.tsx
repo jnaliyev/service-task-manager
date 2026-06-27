@@ -1,3 +1,5 @@
+import { az } from "@/app/client/i18n/az";
+
 type SuccessScreenProps = {
   requestNumber: string;
   onSubmitAnother: () => void;
@@ -8,150 +10,103 @@ export default function SuccessScreen({
   onSubmitAnother,
 }: SuccessScreenProps) {
   return (
-    <main style={pageStyle}>
-      <section style={cardStyle}>
+    <main className="portal-page">
+      <section className="portal-card portal-card--success">
         <div style={headerStyle}>
-          <div style={successIconStyle}>✓</div>
+          <div className="portal-success-icon" aria-hidden="true">
+            ✓
+          </div>
 
-          <p style={eyebrowStyle}>Retail Systems</p>
+          <p style={eyebrowStyle}>{az.brand}</p>
 
-          <h1 style={titleStyle}>Request Submitted Successfully</h1>
+          <h1 style={titleStyle}>{az.successTitle}</h1>
 
-          <p style={subtitleStyle}>
-            Our maintenance team has received your request.
-          </p>
+          <p style={thankYouStyle}>{az.successThankYou}</p>
         </div>
 
         <div style={requestBoxStyle}>
-          <p style={requestLabelStyle}>Request Number</p>
-          <p style={requestNumberStyle}>{requestNumber}</p>
+          <p style={requestLabelStyle}>{az.requestNumber}</p>
+          <p className="portal-request-number">{requestNumber}</p>
 
-          <p style={requestLabelStyle}>Status</p>
-          <p style={statusStyle}>OPEN</p>
+          <div style={statusRowStyle}>
+            <p style={requestLabelStyle}>{az.status}</p>
+            <p className="portal-status-badge">{az.statusOpen}</p>
+          </div>
         </div>
 
-        <p style={{ ...subtitleStyle, textAlign: "center", marginTop: "22px" }}>
-          You will be contacted shortly.
-        </p>
+        <p style={contactStyle}>{az.contactShortly}</p>
 
         <button
           type="button"
-          style={{ ...buttonStyle, marginTop: "24px" }}
+          className="portal-btn-primary"
+          style={{ marginTop: "28px" }}
           onClick={onSubmitAnother}
         >
-          Submit Another Request
+          {az.submitAnother}
         </button>
       </section>
     </main>
   );
 }
 
-const pageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "#f3f4f6",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "40px 16px",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-};
-
-const cardStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: "760px",
-  background: "#ffffff",
-  borderRadius: "22px",
-  padding: "32px",
-  boxShadow: "0 20px 50px rgba(15, 23, 42, 0.12)",
-};
-
 const headerStyle: React.CSSProperties = {
   textAlign: "center",
-  marginBottom: "28px",
+  marginBottom: "32px",
 };
 
 const eyebrowStyle: React.CSSProperties = {
   margin: 0,
   color: "#6b7280",
-  fontSize: "14px",
+  fontSize: "13px",
   fontWeight: 600,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
 };
 
 const titleStyle: React.CSSProperties = {
-  margin: "8px 0 10px",
+  margin: "10px 0 12px",
   color: "#111827",
-  fontSize: "34px",
-  lineHeight: 1.1,
+  fontSize: "clamp(1.5rem, 4.5vw, 1.875rem)",
+  lineHeight: 1.2,
+  letterSpacing: "-0.02em",
 };
 
-const subtitleStyle: React.CSSProperties = {
+const thankYouStyle: React.CSSProperties = {
   margin: 0,
-  color: "#6b7280",
-  fontSize: "16px",
-};
-
-const buttonStyle: React.CSSProperties = {
-  width: "100%",
-  height: "52px",
-  border: "none",
-  borderRadius: "14px",
-  background: "#111827",
-  color: "#ffffff",
-  fontSize: "16px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const successIconStyle: React.CSSProperties = {
-  width: "64px",
-  height: "64px",
-  borderRadius: "50%",
-  background: "#16a34a",
-  color: "#ffffff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: "34px",
-  fontWeight: 800,
-  margin: "0 auto 18px",
+  color: "#374151",
+  fontSize: "15px",
+  lineHeight: 1.55,
+  maxWidth: "360px",
+  marginInline: "auto",
 };
 
 const requestBoxStyle: React.CSSProperties = {
   background: "#f9fafb",
   border: "1px solid #e5e7eb",
-  borderRadius: "18px",
-  padding: "24px",
+  borderRadius: "22px",
+  padding: "28px 24px",
   textAlign: "center",
 };
 
 const requestLabelStyle: React.CSSProperties = {
-  margin: "0 0 8px",
+  margin: "0 0 10px",
   color: "#6b7280",
-  fontSize: "13px",
+  fontSize: "12px",
   fontWeight: 700,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
 };
 
-const requestNumberStyle: React.CSSProperties = {
-  margin: "0 0 22px",
-  color: "#111827",
-  fontSize: "30px",
-  fontWeight: 800,
-  letterSpacing: "0.04em",
+const statusRowStyle: React.CSSProperties = {
+  marginTop: "24px",
+  paddingTop: "24px",
+  borderTop: "1px solid #e5e7eb",
 };
 
-const statusStyle: React.CSSProperties = {
-  display: "inline-block",
-  margin: 0,
-  background: "#fef3c7",
-  color: "#92400e",
-  padding: "8px 14px",
-  borderRadius: "999px",
-  fontSize: "13px",
-  fontWeight: 800,
-  letterSpacing: "0.06em",
+const contactStyle: React.CSSProperties = {
+  margin: "24px 0 0",
+  color: "#6b7280",
+  fontSize: "15px",
+  lineHeight: 1.55,
+  textAlign: "center",
 };

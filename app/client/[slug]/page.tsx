@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import RequestForm, { type Store } from "../components/RequestForm";
 import SuccessScreen from "../components/SuccessScreen";
 import PortalNotFound from "../components/PortalNotFound";
+import ClientPortalTabs from "../components/ClientPortalTabs";
+import MyRequests from "../components/MyRequests";
+import ClientLogin from "../components/ClientLogin";
+import ClientPortalUserBar from "../components/ClientPortalUserBar";
+import { useClientPortalSession } from "../hooks/useClientPortalSession";
 import type { ClientPortalApiResponse } from "../types/portal";
+
+import { az } from "../i18n/az";
 
 type ClientPortalSlugPageProps = {
   params: Promise<{ slug: string }>;
@@ -12,31 +19,10 @@ type ClientPortalSlugPageProps = {
 
 function PortalLoadingState() {
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f3f4f6",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "40px 16px",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-      }}
-    >
-      <section
-        style={{
-          width: "100%",
-          maxWidth: "560px",
-          background: "#ffffff",
-          borderRadius: "22px",
-          padding: "32px",
-          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.12)",
-          textAlign: "center",
-        }}
-      >
+    <main className="portal-page">
+      <section className="portal-card" style={{ textAlign: "center" }}>
         <p style={{ margin: 0, color: "#6b7280", fontSize: "16px" }}>
-          Loading client portal...
+          {az.loadingPortal}
         </p>
       </section>
     </main>
@@ -54,6 +40,9 @@ export default function ClientPortalSlugPage({
   );
   const [submitted, setSubmitted] = useState(false);
   const [requestNumber, setRequestNumber] = useState("");
+  const [activeTab, setActiveTab] = useState<"submit" | "requests">("submit");
+  const { session, ready, setSession, clearSession } =
+    useClientPortalSession(slug);
 
   useEffect(() => {
     async function resolveParams() {
@@ -75,12 +64,6 @@ export default function ClientPortalSlugPage({
         const response = await fetch(`/api/client-portals/${slug}`);
 
         if (response.status === 404) {
-          const errorBody = await response.json().catch(() => null);
-          console.log("[client_portals] Portal not found", {
-            slug,
-            status: response.status,
-            errorBody,
-          });
           setPortalData(null);
           setNotFound(true);
           return;
@@ -104,12 +87,36 @@ export default function ClientPortalSlugPage({
     loadPortal();
   }, [slug]);
 
-  if (!slug || loading) {
+  const allowedStores = useMemo(() => {
+    if (!portalData || !session) return [];
+
+    const stores = portalData.stores as Store[];
+
+    if (session.accessLevel === "company") {
+      return stores;
+    }
+
+    const allowedIds = new Set(session.storeIds);
+
+    return stores.filter((store) => allowedIds.has(store.id));
+  }, [portalData, session]);
+
+  if (!slug || loading || !ready) {
     return <PortalLoadingState />;
   }
 
   if (notFound || !portalData) {
     return <PortalNotFound />;
+  }
+
+  if (!session) {
+    return (
+      <ClientLogin
+        slug={slug}
+        companyName={portalData.portal.companyName}
+        onSuccess={setSession}
+      />
+    );
   }
 
   if (submitted) {
@@ -125,16 +132,36 @@ export default function ClientPortalSlugPage({
   }
 
   return (
-    <RequestForm
-      stores={portalData.stores as Store[]}
-      portalConfig={{
-        slug: portalData.portal.slug,
-        companyName: portalData.portal.companyName,
-      }}
-      onSuccess={(number) => {
-        setRequestNumber(number);
-        setSubmitted(true);
-      }}
-    />
+    <>
+      <div className="portal-tab-bar-wrap">
+        <ClientPortalUserBar session={session} onLogout={clearSession} />
+        <ClientPortalTabs
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          submitLabel={az.tabSubmit}
+          requestsLabel={az.tabMyRequests}
+        />
+      </div>
+
+      {activeTab === "submit" ? (
+        <RequestForm
+          stores={allowedStores}
+          portalConfig={{
+            slug: portalData.portal.slug,
+            companyName: portalData.portal.companyName,
+          }}
+          clientUser={{
+            fullName: session.fullName,
+            username: session.username,
+          }}
+          onSuccess={(number) => {
+            setRequestNumber(number);
+            setSubmitted(true);
+          }}
+        />
+      ) : (
+        <MyRequests slug={slug} companyName={portalData.portal.companyName} session={session} />
+      )}
+    </>
   );
 }

@@ -1,27 +1,30 @@
+import { az } from "@/app/client/i18n/az";
+
 type CompanySelectProps = {
   companies: string[];
   value: string;
-  onChange: (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => void;
+  disabled?: boolean;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 };
 
 export default function CompanySelect({
   companies,
   value,
+  disabled = false,
   onChange,
 }: CompanySelectProps) {
   return (
     <div>
-      <label style={labelStyle}>Company</label>
+      <label style={labelStyle}>{az.company}</label>
       <select
         name="company"
         value={value}
         onChange={onChange}
         required
-        style={inputStyle}
+        disabled={disabled}
+        className="portal-field-select"
       >
-        <option value="">Select company</option>
+        <option value="">{az.selectCompany}</option>
         {companies.map((company) => (
           <option key={company} value={company}>
             {company}
@@ -34,21 +37,8 @@ export default function CompanySelect({
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  marginBottom: "7px",
+  marginBottom: "10px",
   color: "#374151",
   fontSize: "14px",
   fontWeight: 600,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  height: "46px",
-  padding: "0 13px",
-  borderRadius: "12px",
-  border: "1px solid #d1d5db",
-  fontSize: "15px",
-  color: "#111827",
-  background: "#ffffff",
-  outline: "none",
-  boxSizing: "border-box",
 };

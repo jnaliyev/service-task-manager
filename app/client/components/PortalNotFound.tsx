@@ -1,39 +1,20 @@
+import { az } from "@/app/client/i18n/az";
+
 type PortalNotFoundProps = {
   message?: string;
 };
 
 export default function PortalNotFound({
-  message = "Portal not found",
+  message = az.portalNotFound,
 }: PortalNotFoundProps) {
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f3f4f6",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "40px 16px",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-      }}
-    >
-      <section
-        style={{
-          width: "100%",
-          maxWidth: "560px",
-          background: "#ffffff",
-          borderRadius: "22px",
-          padding: "32px",
-          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.12)",
-          textAlign: "center",
-        }}
-      >
+    <main className="portal-page">
+      <section className="portal-card" style={{ textAlign: "center" }}>
         <div
           style={{
             width: "56px",
             height: "56px",
-            borderRadius: "16px",
+            borderRadius: "18px",
             background: "#fee2e2",
             color: "#b91c1c",
             display: "flex",
@@ -47,30 +28,26 @@ export default function PortalNotFound({
           !
         </div>
 
-        <p
-          style={{
-            margin: "0 0 8px",
-            color: "#6b7280",
-            fontSize: "14px",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-          }}
-        >
-          Retail Systems
-        </p>
+        <p style={eyebrowStyle}>{az.brand}</p>
 
-        <h1
-          style={{
-            margin: 0,
-            color: "#111827",
-            fontSize: "30px",
-            lineHeight: 1.2,
-          }}
-        >
-          {message}
-        </h1>
+        <h1 style={titleStyle}>{message}</h1>
       </section>
     </main>
   );
 }
+
+const eyebrowStyle: React.CSSProperties = {
+  margin: "0 0 8px",
+  color: "#6b7280",
+  fontSize: "13px",
+  fontWeight: 600,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+};
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#111827",
+  fontSize: "clamp(1.5rem, 4.5vw, 1.875rem)",
+  lineHeight: 1.2,
+};

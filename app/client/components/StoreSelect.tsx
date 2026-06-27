@@ -1,3 +1,5 @@
+import { az } from "@/app/client/i18n/az";
+
 type Store = {
   id: number;
   company_name: string | null;
@@ -10,34 +12,34 @@ type StoreSelectProps = {
   filteredStores: Store[];
   company: string;
   value: string;
-  onChange: (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => void;
+  disabled?: boolean;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 };
 
 export default function StoreSelect({
   filteredStores,
   company,
   value,
+  disabled = false,
   onChange,
 }: StoreSelectProps) {
   return (
     <div>
-      <label style={labelStyle}>Store</label>
+      <label style={labelStyle}>{az.store}</label>
       <select
         name="store"
         value={value}
         onChange={onChange}
         required
-        disabled={!company}
+        disabled={!company || disabled}
+        className="portal-field-select"
         style={{
-          ...inputStyle,
           background: company ? "#ffffff" : "#f9fafb",
-          cursor: company ? "pointer" : "not-allowed",
+          cursor: company && !disabled ? "pointer" : "not-allowed",
         }}
       >
         <option value="">
-          {company ? "Select store" : "Select company first"}
+          {company ? az.selectStore : az.selectCompanyFirst}
         </option>
 
         {filteredStores.map((store) => (
@@ -53,21 +55,8 @@ export default function StoreSelect({
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  marginBottom: "7px",
+  marginBottom: "10px",
   color: "#374151",
   fontSize: "14px",
   fontWeight: 600,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  height: "46px",
-  padding: "0 13px",
-  borderRadius: "12px",
-  border: "1px solid #d1d5db",
-  fontSize: "15px",
-  color: "#111827",
-  background: "#ffffff",
-  outline: "none",
-  boxSizing: "border-box",
 };

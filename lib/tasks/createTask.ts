@@ -12,16 +12,25 @@ export type CreateTaskPayload = {
   store_id?: number | null;
   issue: string;
   status: string;
-  category: string;
-  department: string;
-  priority: string;
+  category?: string;
+  department?: string;
+  priority?: string;
   due_date?: string | null;
   employee_id?: string | null;
   technician?: string;
   created_by: string;
+  attachments?: string[];
+  client_description?: string;
+  ai_category?: string;
+  ai_department?: string;
+  ai_priority?: string;
+  ai_summary?: string;
+  ai_confidence?: number;
 };
 
 export async function createTask(payload: CreateTaskPayload) {
+  console.log("[createTask] inserting payload:", payload);
+
   const { data, error } = await supabase
     .from("tasks")
     .insert([payload])

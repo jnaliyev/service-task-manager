@@ -1,46 +1,54 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ClientPortalConfig } from "@/app/client/types/portal";
+import { az } from "@/app/client/i18n/az";
+import { buildClientCreatedBy } from "@/lib/clientPortals/clientSession";
 import CompanySelect from "./CompanySelect";
 import StoreSelect from "./StoreSelect";
 
-export type Store = {
-  id: number;
-  company_name: string | null;
-  store_name: string | null;
-  location: string | null;
-  store_code: string | null;
-};
+import type { Store } from "@/app/client/types/store";
+
+export type { Store };
 
 type ClientRequestForm = {
   company: string;
   store: string;
-  contactPerson: string;
-  phone: string;
-  category: string;
-  priority: string;
   description: string;
+};
+
+type ClientAiAnalysis = {
+  ai_category: string;
+  ai_department: string;
+  ai_priority: string;
+  ai_summary: string;
+  ai_confidence: number;
+};
+
+type PhotoItem = {
+  id: string;
+  file: File;
+  previewUrl: string;
 };
 
 const initialFormState: ClientRequestForm = {
   company: "",
   store: "",
-  contactPerson: "",
-  phone: "",
-  category: "",
-  priority: "Normal",
   description: "",
 };
 
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ATTACHMENTS_BUCKET = "client-attachments";
 
-async function uploadSelectedPhotos(files: File[]): Promise<string[]> {
+async function uploadSelectedPhotos(
+  files: File[],
+  onProgress?: (completed: number, total: number) => void
+): Promise<string[]> {
   const uploadedUrls: string[] = [];
 
-  for (const file of files) {
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
     const filePath = `client-requests/${Date.now()}-${file.name}`;
 
     const { error: uploadError } = await supabase.storage
@@ -59,82 +67,25 @@ async function uploadSelectedPhotos(files: File[]): Promise<string[]> {
       .getPublicUrl(filePath);
 
     uploadedUrls.push(data.publicUrl);
+    onProgress?.(index + 1, files.length);
   }
 
   return uploadedUrls;
-}
-
-function runBackgroundAiAnalysis({
-  taskId,
-  issue,
-  category,
-  priority,
-  attachments,
-}: {
-  taskId: number;
-  issue: string;
-  category: string;
-  priority: string;
-  attachments: string[];
-}) {
-  void (async () => {
-    try {
-      const analyzeResponse = await fetch("/api/ai/analyze-task", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          issue,
-          category,
-          priority,
-          attachments,
-        }),
-      });
-
-      if (!analyzeResponse.ok) {
-        console.error(
-          "Background AI analysis failed:",
-          await analyzeResponse.text()
-        );
-        return;
-      }
-
-      const aiResult = await analyzeResponse.json();
-
-      const updateResponse = await fetch("/api/tasks/update-ai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          task_id: taskId,
-          ai_category: aiResult.ai_category,
-          ai_priority: aiResult.ai_priority,
-          ai_summary: aiResult.ai_summary,
-          ai_confidence: aiResult.ai_confidence,
-        }),
-      });
-
-      if (!updateResponse.ok) {
-        console.error(
-          "Background AI save failed:",
-          await updateResponse.text()
-        );
-      }
-    } catch (error) {
-      console.error("Background AI analysis error:", error);
-    }
-  })();
 }
 
 type RequestFormProps = {
   stores: Store[];
   onSuccess: (requestNumber: string) => void;
   portalConfig?: ClientPortalConfig | null;
+  clientUser?: {
+    fullName: string;
+    username: string;
+  } | null;
 };
 
-function createInitialFormState(portalConfig?: ClientPortalConfig | null): ClientRequestForm {
+function createInitialFormState(
+  portalConfig?: ClientPortalConfig | null
+): ClientRequestForm {
   if (portalConfig) {
     return {
       ...initialFormState,
@@ -145,22 +96,47 @@ function createInitialFormState(portalConfig?: ClientPortalConfig | null): Clien
   return initialFormState;
 }
 
+function createPhotoItem(file: File): PhotoItem {
+  return {
+    id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    file,
+    previewUrl: URL.createObjectURL(file),
+  };
+}
+
 export default function RequestForm({
   stores,
   onSuccess,
   portalConfig = null,
+  clientUser = null,
 }: RequestFormProps) {
   const isPortalMode = Boolean(portalConfig);
   const [form, setForm] = useState<ClientRequestForm>(() =>
     createInitialFormState(portalConfig)
   );
-  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [photoItems, setPhotoItems] = useState<PhotoItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitPhase, setSubmitPhase] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+  const photoItemsRef = useRef(photoItems);
+  photoItemsRef.current = photoItems;
 
   useEffect(() => {
     if (!portalConfig) return;
 
     setForm(createInitialFormState(portalConfig));
   }, [portalConfig]);
+
+  useEffect(() => {
+    return () => {
+      photoItemsRef.current.forEach((item) =>
+        URL.revokeObjectURL(item.previewUrl)
+      );
+    };
+  }, []);
 
   const companies = useMemo(() => {
     const uniqueCompanies = new Set<string>();
@@ -193,6 +169,10 @@ export default function RequestForm({
       );
   }, [stores, form.company, portalConfig?.companyName]);
 
+  const uploadPercent = uploadProgress
+    ? Math.round((uploadProgress.current / uploadProgress.total) * 100)
+    : 0;
+
   function handleChange(
     event: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -217,10 +197,34 @@ export default function RequestForm({
     );
 
     if (validFiles.length < incomingFiles.length) {
-      alert("Only JPEG, PNG, and WebP images are allowed.");
+      alert(az.invalidImageType);
     }
 
-    setSelectedPhotos(validFiles);
+    if (validFiles.length > 0) {
+      setPhotoItems((prev) => [
+        ...prev,
+        ...validFiles.map((file) => createPhotoItem(file)),
+      ]);
+    }
+
+    event.target.value = "";
+  }
+
+  function removePhoto(id: string) {
+    setPhotoItems((prev) => {
+      const item = prev.find((photo) => photo.id === id);
+
+      if (item) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+
+      return prev.filter((photo) => photo.id !== id);
+    });
+  }
+
+  function clearPhotos() {
+    photoItems.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    setPhotoItems([]);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -228,13 +232,11 @@ export default function RequestForm({
 
     const companyName = portalConfig?.companyName || form.company;
     const storeName = form.store;
+    const clientDescription = form.description.trim();
+    const selectedPhotos = photoItems.map((item) => item.file);
 
-    if (!companyName || !storeName || !form.description) {
-      alert(
-        isPortalMode
-          ? "Please fill Store and Description."
-          : "Please fill Company, Store and Description."
-      );
+    if (!companyName || !storeName || !clientDescription) {
+      alert(isPortalMode ? az.validationPortal : az.validationDefault);
       return;
     }
 
@@ -243,36 +245,80 @@ export default function RequestForm({
         store.company_name === companyName && store.store_name === storeName
     );
 
-    let attachments: string[] = [];
-
-    if (selectedPhotos.length > 0) {
-      try {
-        attachments = await uploadSelectedPhotos(selectedPhotos);
-      } catch (error) {
-        console.error("Photo upload error:", error);
-        alert("Failed to upload photos. Please try again.");
-        return;
-      }
-    }
-
-    const taskPayload = {
-      store: storeName,
-      company_name: companyName,
-      location: selectedStore?.location || "",
-      store_id: selectedStore?.id || null,
-      issue: form.description,
-      status: "Open",
-      category: form.category,
-      department: form.category,
-      priority: form.priority,
-      due_date: null,
-      employee_id: null,
-      technician: "",
-      created_by: `Client Portal - ${form.contactPerson} - ${form.phone}`,
-      attachments,
-    };
+    setIsSubmitting(true);
 
     try {
+      let attachments: string[] = [];
+
+      if (selectedPhotos.length > 0) {
+        setSubmitPhase(az.uploadingPhotos);
+        setUploadProgress({ current: 0, total: selectedPhotos.length });
+
+        attachments = await uploadSelectedPhotos(selectedPhotos, (current, total) => {
+          setUploadProgress({ current, total });
+        });
+
+        setUploadProgress(null);
+      }
+
+      setSubmitPhase(az.analyzingRequest);
+
+      console.log("[Client Submit] before AI analyze");
+
+      const analyzeResponse = await fetch("/api/ai/analyze-client-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          issue: clientDescription,
+          attachments,
+        }),
+      });
+
+      console.log("[Client Submit] AI analyze response:", analyzeResponse.status);
+
+      if (!analyzeResponse.ok) {
+        throw new Error("AI analysis failed");
+      }
+
+      const aiResult = (await analyzeResponse.json()) as ClientAiAnalysis;
+
+      setSubmitPhase(az.submittingRequest);
+
+      const taskPayload = {
+        store: storeName,
+        company_name: companyName,
+        location: selectedStore?.location || "",
+        store_id: selectedStore?.id || null,
+        issue: clientDescription,
+        client_description: clientDescription,
+        status: "Open",
+        category: aiResult.ai_category,
+        department: aiResult.ai_department,
+        priority: aiResult.ai_priority,
+        due_date: null,
+        employee_id: null,
+        technician: "",
+        created_by: isPortalMode
+          ? clientUser
+            ? buildClientCreatedBy(
+                portalConfig?.companyName || companyName,
+                clientUser.fullName,
+                clientUser.username
+              )
+            : `Client Portal - ${portalConfig?.companyName}`
+          : "Client Portal",
+        attachments,
+        ai_category: aiResult.ai_category,
+        ai_department: aiResult.ai_department,
+        ai_priority: aiResult.ai_priority,
+        ai_summary: aiResult.ai_summary,
+        ai_confidence: aiResult.ai_confidence,
+      };
+
+      console.log("[Client Submit] before task create", taskPayload);
+
       const response = await fetch("/api/tasks/create", {
         method: "POST",
         headers: {
@@ -281,201 +327,144 @@ export default function RequestForm({
         body: JSON.stringify(taskPayload),
       });
 
+      console.log("[Client Submit] task create response:", response.status);
+
       if (!response.ok) {
         throw new Error("Failed to create task");
       }
 
       const result = await response.json();
 
-      console.log(result);
-      runBackgroundAiAnalysis({
-        taskId: result.task.id,
-        issue: form.description,
-        category: form.category,
-        priority: form.priority,
-        attachments,
-      });
       onSuccess(
         `RS-${new Date().getFullYear()}-${String(result.task.id).padStart(6, "0")}`
       );
 
       setForm(createInitialFormState(portalConfig));
-      setSelectedPhotos([]);
+      clearPhotos();
     } catch (error) {
       console.error(error);
-      alert("Error while submitting request.");
-      return;
+      alert(az.submitError);
+    } finally {
+      setIsSubmitting(false);
+      setSubmitPhase("");
+      setUploadProgress(null);
     }
-
-    alert("Request submitted successfully.");
   }
 
   return (
-    <main style={pageStyle}>
-      <section style={cardStyle}>
+    <main className="portal-page">
+      <section className="portal-card">
         <div style={headerStyle}>
           <div style={logoStyle}>RS</div>
-
-          <p style={eyebrowStyle}>Retail Systems</p>
-
-          <h1 style={titleStyle}>Maintenance Portal</h1>
-
+          <p style={eyebrowStyle}>{az.brand}</p>
+          <h1 style={titleStyle}>{az.portalTitle}</h1>
           <p style={subtitleStyle}>
             {isPortalMode
-              ? `Submit a maintenance request for ${portalConfig?.companyName}.`
-              : "Submit a maintenance request and our team will review it shortly."}
+              ? az.portalSubtitlePortal(portalConfig?.companyName || "")
+              : az.portalSubtitleDefault}
           </p>
         </div>
 
         {isPortalMode && (
-          <div
-            style={{
-              background: "#f9fafb",
-              border: "1px solid #e5e7eb",
-              borderRadius: "14px",
-              padding: "16px",
-              marginBottom: "18px",
-            }}
-          >
-            <p
-              style={{
-                margin: "0 0 6px",
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#6b7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-              }}
-            >
-              Company
-            </p>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "16px",
-                fontWeight: 600,
-                color: "#111827",
-              }}
-            >
-              {portalConfig?.companyName}
-            </p>
+          <div style={companyBadgeStyle}>
+            <p style={companyBadgeLabelStyle}>{az.company}</p>
+            <p style={companyBadgeValueStyle}>{portalConfig?.companyName}</p>
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={formStyle}>
-          <div style={gridStyle}>
-            {!isPortalMode && (
-              <CompanySelect
-                companies={companies}
-                value={form.company}
-                onChange={handleChange}
-              />
-            )}
-
-            <StoreSelect
-              filteredStores={filteredStores}
-              company={portalConfig?.companyName || form.company}
-              value={form.store}
+          {!isPortalMode && (
+            <CompanySelect
+              companies={companies}
+              value={form.company}
               onChange={handleChange}
+              disabled={isSubmitting}
             />
+          )}
 
-            <div>
-              <label style={labelStyle}>Contact Person</label>
-              <input
-                name="contactPerson"
-                value={form.contactPerson}
-                onChange={handleChange}
-                required
-                placeholder="Store manager name"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Phone</label>
-              <input
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                required
-                placeholder="+994..."
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Category</label>
-              <select
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                required
-                style={inputStyle}
-              >
-                <option value="">Select category</option>
-                <option value="Construction">Construction</option>
-                <option value="Electrical">Electrical</option>
-                <option value="HVAC">HVAC</option>
-                <option value="Plumbing">Plumbing</option>
-                <option value="Furniture">Furniture</option>
-                <option value="Low Current Systems">
-                  Low Current Systems
-                </option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Priority</label>
-              <select
-                name="priority"
-                value={form.priority}
-                onChange={handleChange}
-                required
-                style={inputStyle}
-              >
-                <option value="Low">Low</option>
-                <option value="Normal">Normal</option>
-                <option value="Urgent">Urgent</option>
-              </select>
-            </div>
-          </div>
+          <StoreSelect
+            filteredStores={filteredStores}
+            company={portalConfig?.companyName || form.company}
+            value={form.store}
+            onChange={handleChange}
+            disabled={isSubmitting}
+          />
 
           <div>
-            <label style={labelStyle}>Description</label>
+            <label style={labelStyle}>{az.issueDescription}</label>
             <textarea
               name="description"
               value={form.description}
               onChange={handleChange}
               required
-              placeholder="Please describe the issue..."
-              style={textareaStyle}
+              disabled={isSubmitting}
+              placeholder={az.issuePlaceholder}
+              className="portal-field-textarea"
             />
           </div>
 
           <div>
-            <label style={labelStyle}>Photos</label>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              onChange={handlePhotoChange}
-              style={fileInputStyle}
-            />
-            <p style={fileHintStyle}>JPEG, PNG, or WebP. You can select multiple files.</p>
-            {selectedPhotos.length > 0 && (
-              <ul style={fileListStyle}>
-                {selectedPhotos.map((file, index) => (
-                  <li key={`${file.name}-${index}`} style={fileListItemStyle}>
-                    {file.name}
-                  </li>
+            <label style={labelStyle}>{az.uploadPhotos}</label>
+            <label className="portal-upload-area">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                disabled={isSubmitting}
+                onChange={handlePhotoChange}
+                style={{ display: "none" }}
+              />
+              <span style={uploadTitleStyle}>{az.choosePhotos}</span>
+              <span style={uploadHintStyle}>{az.uploadHint}</span>
+            </label>
+
+            {uploadProgress && (
+              <div className="portal-upload-progress">
+                <div className="portal-upload-progress-label">
+                  <span>{az.uploadingPhotos}</span>
+                  <span>
+                    {az.uploadProgress(
+                      uploadProgress.current,
+                      uploadProgress.total
+                    )}
+                  </span>
+                </div>
+                <div className="portal-upload-progress-track">
+                  <div
+                    className="portal-upload-progress-fill"
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {photoItems.length > 0 && (
+              <div className="portal-photo-grid">
+                {photoItems.map((item) => (
+                  <div key={item.id} className="portal-photo-preview">
+                    <img src={item.previewUrl} alt={item.file.name} />
+                    <button
+                      type="button"
+                      className="portal-photo-remove"
+                      disabled={isSubmitting}
+                      onClick={() => removePhoto(item.id)}
+                      aria-label={az.removePhoto}
+                      title={az.removePhoto}
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
 
-          <button type="submit" style={buttonStyle}>
-            Submit Request
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="portal-btn-primary"
+          >
+            {isSubmitting ? submitPhase || az.submitting : az.submit}
           </button>
         </form>
       </section>
@@ -483,35 +472,15 @@ export default function RequestForm({
   );
 }
 
-const pageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "#f3f4f6",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "40px 16px",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
-};
-
-const cardStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: "760px",
-  background: "#ffffff",
-  borderRadius: "22px",
-  padding: "32px",
-  boxShadow: "0 20px 50px rgba(15, 23, 42, 0.12)",
-};
-
 const headerStyle: React.CSSProperties = {
   textAlign: "center",
-  marginBottom: "28px",
+  marginBottom: "32px",
 };
 
 const logoStyle: React.CSSProperties = {
   width: "56px",
   height: "56px",
-  borderRadius: "16px",
+  borderRadius: "18px",
   background: "#111827",
   color: "#ffffff",
   display: "flex",
@@ -519,114 +488,80 @@ const logoStyle: React.CSSProperties = {
   justifyContent: "center",
   fontWeight: 800,
   fontSize: "18px",
-  margin: "0 auto 14px",
+  margin: "0 auto 16px",
   letterSpacing: "0.5px",
 };
 
 const eyebrowStyle: React.CSSProperties = {
   margin: 0,
   color: "#6b7280",
-  fontSize: "14px",
+  fontSize: "13px",
   fontWeight: 600,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
 };
 
 const titleStyle: React.CSSProperties = {
-  margin: "8px 0 10px",
+  margin: "8px 0 12px",
   color: "#111827",
-  fontSize: "34px",
-  lineHeight: 1.1,
+  fontSize: "clamp(1.75rem, 5vw, 2rem)",
+  lineHeight: 1.15,
+  letterSpacing: "-0.02em",
 };
 
 const subtitleStyle: React.CSSProperties = {
   margin: 0,
   color: "#6b7280",
+  fontSize: "15px",
+  lineHeight: 1.55,
+};
+
+const companyBadgeStyle: React.CSSProperties = {
+  background: "#f9fafb",
+  border: "1px solid #e5e7eb",
+  borderRadius: "18px",
+  padding: "16px 18px",
+  marginBottom: "24px",
+};
+
+const companyBadgeLabelStyle: React.CSSProperties = {
+  margin: "0 0 4px",
+  fontSize: "11px",
+  fontWeight: 700,
+  color: "#6b7280",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+};
+
+const companyBadgeValueStyle: React.CSSProperties = {
+  margin: 0,
   fontSize: "16px",
+  fontWeight: 600,
+  color: "#111827",
 };
 
 const formStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  gap: "18px",
-};
-
-const gridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-  gap: "16px",
+  gap: "24px",
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  marginBottom: "7px",
+  marginBottom: "10px",
   color: "#374151",
   fontSize: "14px",
   fontWeight: 600,
 };
 
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  height: "46px",
-  padding: "0 13px",
-  borderRadius: "12px",
-  border: "1px solid #d1d5db",
+const uploadTitleStyle: React.CSSProperties = {
   fontSize: "15px",
+  fontWeight: 600,
   color: "#111827",
-  background: "#ffffff",
-  outline: "none",
-  boxSizing: "border-box",
 };
 
-const textareaStyle: React.CSSProperties = {
-  ...inputStyle,
-  minHeight: "120px",
-  padding: "13px",
-  resize: "vertical",
-  lineHeight: 1.5,
-};
-
-const buttonStyle: React.CSSProperties = {
-  width: "100%",
-  height: "52px",
-  border: "none",
-  borderRadius: "14px",
-  background: "#111827",
-  color: "#ffffff",
-  fontSize: "16px",
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const fileInputStyle: React.CSSProperties = {
-  ...inputStyle,
-  height: "auto",
-  padding: "11px 13px",
-  cursor: "pointer",
-};
-
-const fileHintStyle: React.CSSProperties = {
-  margin: "8px 0 0",
-  color: "#6b7280",
+const uploadHintStyle: React.CSSProperties = {
   fontSize: "13px",
-};
-
-const fileListStyle: React.CSSProperties = {
-  margin: "12px 0 0",
-  padding: "12px 14px",
-  listStyle: "none",
-  background: "#f9fafb",
-  border: "1px solid #e5e7eb",
-  borderRadius: "12px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "6px",
-};
-
-const fileListItemStyle: React.CSSProperties = {
-  margin: 0,
-  color: "#374151",
-  fontSize: "14px",
-  lineHeight: 1.4,
-  wordBreak: "break-all",
+  color: "#6b7280",
+  lineHeight: 1.45,
 };

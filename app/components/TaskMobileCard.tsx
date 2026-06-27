@@ -38,9 +38,14 @@ type Props = {
   }: Props) {
     return (
       <div
+        className={
+          highlightStyle.background === "#bbf7d0"
+            ? "task-card-highlight"
+            : undefined
+        }
         style={{
           ...highlightStyle,
-          background: "white",
+          background: highlightStyle.background || "white",
           padding: "16px",
           borderRadius: "16px",
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",

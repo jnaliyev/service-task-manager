@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Store } from "@/app/client/components/RequestForm";
+import type { Store } from "@/app/client/types/store";
 import type { ClientPortalRecord } from "@/app/client/types/portal";
 
 const supabase = createClient(
