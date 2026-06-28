@@ -18,12 +18,14 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Portal not found" }, { status: 404 });
     }
 
-    const { portal, stores } = portalContext;
+    const { portal, stores, companyName, logoUrl } = portalContext;
 
     return NextResponse.json({
       portal: {
         slug: portal.slug,
-        companyName: portal.company_name,
+        companyName,
+        clientId: portal.client_id ?? null,
+        logoUrl,
       },
       stores,
     });

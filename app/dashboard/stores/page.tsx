@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { restoreClientAssignmentsFromCompanyName } from "./restoreClientAssignments";
+
+type ClientOption = {
+  id: number | string;
+  client_name: string | null;
+};
 
 type Store = {
   id: number;
@@ -9,6 +15,8 @@ type Store = {
   store_name: string | null;
   location: string | null;
   store_code?: string | null;
+  client_id: number | string | null;
+  clients: { client_name: string | null } | null;
 };
 
 const supabase = createClient(
@@ -54,23 +62,62 @@ const tdStyle = {
   borderBottom: "1px solid #e5e7eb",
 };
 
+function getClientName(store: Store): string {
+  const linkedName = store.clients?.client_name?.trim();
+  if (linkedName) return linkedName;
+
+  const legacyCompany = store.company_name?.trim();
+  if (legacyCompany) return legacyCompany;
+
+  if (store.client_id) return "Unassigned";
+
+  return "Unassigned";
+}
+
+function normalizeClientId(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "";
+  return String(value);
+}
+
+function parseClientId(value: string): number | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getSelectedClientName(
+  clientId: string,
+  clientOptions: ClientOption[]
+): string {
+  const client = clientOptions.find(
+    (option) => normalizeClientId(option.id) === clientId
+  );
+  return client?.client_name?.trim() || "";
+}
+
 export default function StoresPage() {
   const [stores, setStores] = useState<Store[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [searchText, setSearchText] = useState("");
   const [newStore, setNewStore] = useState({
-    company_name: "",
+    client_id: "",
     store_name: "",
     location: "",
     store_code: "",
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({
-    company_name: "",
+    client_id: "",
     store_name: "",
     location: "",
     store_code: "",
   });
   const [loading, setLoading] = useState(true);
+  const [bulkClientId, setBulkClientId] = useState("");
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [bulkAssigning, setBulkAssigning] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [restoringAssignments, setRestoringAssignments] = useState(false);
 
   useEffect(() => {
     async function checkUser() {
@@ -83,19 +130,52 @@ export default function StoresPage() {
         return;
       }
 
-      await loadStores();
+      setRestoringAssignments(true);
+
+      try {
+        const result = await restoreClientAssignmentsFromCompanyName(supabase);
+
+        if (result.createdClients > 0 || result.assignedStores > 0) {
+          setSuccessMessage(
+            `Restored ownership from company_name. Created ${result.createdClients} client${result.createdClients === 1 ? "" : "s"}. Assigned ${result.assignedStores} store${result.assignedStores === 1 ? "" : "s"}.`
+          );
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Error restoring client assignments from company_name");
+      } finally {
+        setRestoringAssignments(false);
+      }
+
+      await Promise.all([loadStores(), loadClients()]);
     }
 
     checkUser();
   }, []);
+
+  async function loadClients() {
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, client_name, status")
+      .eq("status", "Active")
+      .order("client_name", { ascending: true });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setClients(data || []);
+  }
 
   async function loadStores() {
     setLoading(true);
 
     const { data, error } = await supabase
       .from("stores")
-      .select("*")
-      .order("company_name", { ascending: true })
+      .select(
+        "id, company_name, store_name, location, store_code, client_id, clients(client_name)"
+      )
       .order("store_name", { ascending: true });
 
     if (error) {
@@ -105,7 +185,17 @@ export default function StoresPage() {
       return;
     }
 
-    setStores(data || []);
+    const normalizedStores: Store[] = (data || []).map((store) => ({
+      id: store.id,
+      company_name: store.company_name,
+      store_name: store.store_name,
+      location: store.location,
+      store_code: store.store_code,
+      client_id: store.client_id,
+      clients: Array.isArray(store.clients) ? store.clients[0] ?? null : store.clients,
+    }));
+
+    setStores(normalizedStores);
     setLoading(false);
   }
 
@@ -113,36 +203,30 @@ export default function StoresPage() {
     const search = searchText.toLowerCase().trim();
 
     const validStores = stores.filter((store) => {
-      const company = (store.company_name || "").trim();
       const name = (store.store_name || "").trim();
-
-      return company !== "" || name !== "";
+      return name !== "";
     });
 
     const searchedStores = search
       ? validStores.filter((store) => {
-          const company = (store.company_name || "").toLowerCase();
           const name = (store.store_name || "").toLowerCase();
           const location = (store.location || "").toLowerCase();
-          const code = (store.store_code || "").toLowerCase();
+          const clientName = getClientName(store).toLowerCase();
 
           return (
-            company.includes(search) ||
             name.includes(search) ||
             location.includes(search) ||
-            code.includes(search)
+            clientName.includes(search)
           );
         })
       : validStores;
 
     return [...searchedStores].sort((a, b) => {
-      const byCompany = (a.company_name || "").localeCompare(
-        b.company_name || "",
-        undefined,
-        { sensitivity: "base" }
-      );
+      const byClient = getClientName(a).localeCompare(getClientName(b), undefined, {
+        sensitivity: "base",
+      });
 
-      if (byCompany !== 0) return byCompany;
+      if (byClient !== 0) return byClient;
 
       return (a.store_name || "").localeCompare(b.store_name || "", undefined, {
         sensitivity: "base",
@@ -151,14 +235,19 @@ export default function StoresPage() {
   }, [stores, searchText]);
 
   async function addStore() {
-    if (!newStore.company_name || !newStore.store_name || !newStore.location) {
-      alert("Please fill Company Name, Store Name, and Location");
+    const clientId = parseClientId(newStore.client_id);
+
+    if (!clientId || !newStore.store_name || !newStore.location) {
+      alert("Please select a Client and fill Store Name and Location");
       return;
     }
 
+    const companyName = getSelectedClientName(newStore.client_id, clients);
+
     const { error } = await supabase.from("stores").insert([
       {
-        company_name: newStore.company_name.trim(),
+        client_id: clientId,
+        company_name: companyName,
         store_name: newStore.store_name.trim(),
         location: newStore.location.trim(),
         store_code: newStore.store_code.trim(),
@@ -172,7 +261,7 @@ export default function StoresPage() {
     }
 
     setNewStore({
-      company_name: "",
+      client_id: "",
       store_name: "",
       location: "",
       store_code: "",
@@ -184,7 +273,7 @@ export default function StoresPage() {
   function startEdit(store: Store) {
     setEditingId(store.id);
     setEditForm({
-      company_name: store.company_name || "",
+      client_id: normalizeClientId(store.client_id),
       store_name: store.store_name || "",
       location: store.location || "",
       store_code: store.store_code || "",
@@ -194,7 +283,7 @@ export default function StoresPage() {
   function cancelEdit() {
     setEditingId(null);
     setEditForm({
-      company_name: "",
+      client_id: "",
       store_name: "",
       location: "",
       store_code: "",
@@ -202,17 +291,22 @@ export default function StoresPage() {
   }
 
   async function saveEdit() {
-    if (!editForm.company_name || !editForm.store_name || !editForm.location) {
-      alert("Please fill Company Name, Store Name, and Location");
+    const clientId = parseClientId(editForm.client_id);
+
+    if (!clientId || !editForm.store_name || !editForm.location) {
+      alert("Please select a Client and fill Store Name and Location");
       return;
     }
 
     if (editingId === null) return;
 
+    const companyName = getSelectedClientName(editForm.client_id, clients);
+
     const { error } = await supabase
       .from("stores")
       .update({
-        company_name: editForm.company_name.trim(),
+        client_id: clientId,
+        company_name: companyName,
         store_name: editForm.store_name.trim(),
         location: editForm.location.trim(),
         store_code: editForm.store_code.trim(),
@@ -227,6 +321,57 @@ export default function StoresPage() {
 
     cancelEdit();
     loadStores();
+  }
+
+  const bulkClient = clients.find(
+    (client) => normalizeClientId(client.id) === bulkClientId
+  );
+  const bulkClientName = bulkClient?.client_name?.trim() || "";
+
+  const canBulkAssign =
+    filteredStores.length > 0 && bulkClientId !== "" && !bulkAssigning;
+
+  function requestBulkAssign() {
+    if (!bulkClientId) {
+      alert("Please select a client");
+      return;
+    }
+
+    if (filteredStores.length === 0) return;
+
+    setShowBulkConfirm(true);
+  }
+
+  function cancelBulkConfirm() {
+    setShowBulkConfirm(false);
+  }
+
+  async function confirmBulkAssign() {
+    const clientId = parseClientId(bulkClientId);
+
+    if (!clientId || filteredStores.length === 0) return;
+
+    setBulkAssigning(true);
+
+    const storeIds = filteredStores.map((store) => store.id);
+    const { error } = await supabase
+      .from("stores")
+      .update({ client_id: clientId })
+      .in("id", storeIds);
+
+    setBulkAssigning(false);
+
+    if (error) {
+      console.error(error);
+      alert("Error assigning client to stores");
+      return;
+    }
+
+    setShowBulkConfirm(false);
+    setSuccessMessage(
+      `Assigned ${bulkClientName} to ${storeIds.length} store${storeIds.length === 1 ? "" : "s"}.`
+    );
+    await Promise.all([loadClients(), loadStores()]);
   }
 
   return (
@@ -306,16 +451,22 @@ export default function StoresPage() {
         >
           <div>
             <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
-              Company Name
+              Client
             </label>
-            <input
-              placeholder="Company Name"
-              value={newStore.company_name}
+            <select
+              value={newStore.client_id}
               onChange={(e) =>
-                setNewStore({ ...newStore, company_name: e.target.value })
+                setNewStore({ ...newStore, client_id: e.target.value })
               }
               style={inputStyle}
-            />
+            >
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={normalizeClientId(client.id)} value={normalizeClientId(client.id)}>
+                  {client.client_name?.trim() || "Unnamed Client"}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -380,7 +531,7 @@ export default function StoresPage() {
           <h2 style={{ margin: 0 }}>Stores</h2>
 
           <input
-            placeholder="Search stores..."
+            placeholder="Search by store name, location, or client..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             style={{
@@ -393,7 +544,83 @@ export default function StoresPage() {
 
         <p style={{ margin: "0 0 16px", fontSize: "14px", color: "#6b7280" }}>
           Showing {filteredStores.length} valid stores
+          {restoringAssignments ? " · Restoring client assignments from company_name..." : ""}
         </p>
+
+        {successMessage && (
+          <div
+            style={{
+              marginBottom: "16px",
+              padding: "12px 16px",
+              borderRadius: "10px",
+              background: "#dcfce7",
+              color: "#166534",
+              fontSize: "14px",
+              fontWeight: 600,
+            }}
+          >
+            {successMessage}
+          </div>
+        )}
+
+        <div
+          style={{
+            marginBottom: "24px",
+            padding: "20px",
+            borderRadius: "12px",
+            border: "1px solid #e5e7eb",
+            background: "#f9fafb",
+          }}
+        >
+          <h3 style={{ margin: "0 0 14px", fontSize: "16px" }}>
+            Bulk Client Assignment
+          </h3>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "12px",
+              alignItems: "flex-end",
+            }}
+          >
+            <div style={{ flex: "1 1 220px", minWidth: "220px" }}>
+              <label
+                style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+              >
+                Client
+              </label>
+              <select
+                value={bulkClientId}
+                onChange={(e) => {
+                  setBulkClientId(e.target.value);
+                  setSuccessMessage(null);
+                }}
+                style={inputStyle}
+              >
+                <option value="">Select Client</option>
+                {clients.map((client) => (
+                  <option key={normalizeClientId(client.id)} value={normalizeClientId(client.id)}>
+                    {client.client_name?.trim() || "Unnamed Client"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={requestBulkAssign}
+              disabled={!canBulkAssign}
+              style={{
+                ...buttonStyle,
+                background: canBulkAssign ? "#2563eb" : "#9ca3af",
+                cursor: canBulkAssign ? "pointer" : "not-allowed",
+                opacity: canBulkAssign ? 1 : 0.8,
+              }}
+            >
+              Assign to Filtered Stores
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <p>Loading stores...</p>
@@ -411,7 +638,7 @@ export default function StoresPage() {
               <thead>
                 <tr>
                   <th style={thStyle}>No</th>
-                  <th style={thStyle}>Company</th>
+                  <th style={thStyle}>Client</th>
                   <th style={thStyle}>Store Name</th>
                   <th style={thStyle}>Location</th>
                   <th style={thStyle}>Store Code</th>
@@ -429,18 +656,28 @@ export default function StoresPage() {
 
                       <td style={tdStyle}>
                         {isEditing ? (
-                          <input
-                            value={editForm.company_name}
+                          <select
+                            value={editForm.client_id}
                             onChange={(e) =>
                               setEditForm({
                                 ...editForm,
-                                company_name: e.target.value,
+                                client_id: e.target.value,
                               })
                             }
                             style={{ ...inputStyle, padding: "8px 12px", fontSize: "14px" }}
-                          />
+                          >
+                            <option value="">Select Client</option>
+                            {clients.map((client) => (
+                              <option
+                                key={normalizeClientId(client.id)}
+                                value={normalizeClientId(client.id)}
+                              >
+                                {client.client_name?.trim() || "Unnamed Client"}
+                              </option>
+                            ))}
+                          </select>
                         ) : (
-                          store.company_name || "-"
+                          getClientName(store)
                         )}
                       </td>
 
@@ -553,6 +790,78 @@ export default function StoresPage() {
           </div>
         )}
       </div>
+
+      {showBulkConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: "16px",
+              padding: "28px",
+              width: "100%",
+              maxWidth: "420px",
+              boxShadow: "0 20px 40px rgba(15, 23, 42, 0.2)",
+            }}
+          >
+            <h3 style={{ margin: "0 0 16px", fontSize: "20px" }}>
+              Assign client
+            </h3>
+
+            <p style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: 600 }}>
+              &ldquo;{bulkClientName}&rdquo;
+            </p>
+            <p style={{ margin: "0 0 24px", fontSize: "16px", color: "#64748b" }}>
+              to {filteredStores.length} store
+              {filteredStores.length === 1 ? "" : "s"}?
+            </p>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button
+                onClick={cancelBulkConfirm}
+                disabled={bulkAssigning}
+                style={{
+                  background: "#6b7280",
+                  color: "white",
+                  padding: "10px 18px",
+                  border: "none",
+                  borderRadius: "10px",
+                  cursor: bulkAssigning ? "not-allowed" : "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmBulkAssign}
+                disabled={bulkAssigning}
+                style={{
+                  background: "#2563eb",
+                  color: "white",
+                  padding: "10px 18px",
+                  border: "none",
+                  borderRadius: "10px",
+                  cursor: bulkAssigning ? "not-allowed" : "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                {bulkAssigning ? "Assigning..." : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ClientPortalConfig } from "@/app/client/types/portal";
 import { az } from "@/app/client/i18n/az";
+import ClientBrandMark from "@/app/components/ClientBrandMark";
 import { buildClientCreatedBy } from "@/lib/clientPortals/clientSession";
 import CompanySelect from "./CompanySelect";
 import StoreSelect from "./StoreSelect";
@@ -16,6 +17,7 @@ type ClientRequestForm = {
   company: string;
   store: string;
   description: string;
+  priority: string;
 };
 
 type ClientAiAnalysis = {
@@ -36,7 +38,10 @@ const initialFormState: ClientRequestForm = {
   company: "",
   store: "",
   description: "",
+  priority: "Normal",
 };
+
+const PORTAL_PRIORITY_OPTIONS = ["Normal", "High", "Urgent", "Low"] as const;
 
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ATTACHMENTS_BUCKET = "client-attachments";
@@ -94,6 +99,17 @@ function createInitialFormState(
   }
 
   return initialFormState;
+}
+
+function formatStoreLabel(store: Store): string {
+  const storeName = (store.store_name || "").trim();
+  const location = (store.location || "").trim();
+
+  if (storeName && location) {
+    return `${storeName} / ${location}`;
+  }
+
+  return storeName || location;
 }
 
 function createPhotoItem(file: File): PhotoItem {
@@ -155,6 +171,16 @@ export default function RequestForm({
   }, [stores]);
 
   const filteredStores = useMemo(() => {
+    if (isPortalMode) {
+      return stores
+        .filter((store) => (store.store_name || "").trim() !== "")
+        .sort((a, b) =>
+          (a.store_name || "").localeCompare(b.store_name || "", undefined, {
+            sensitivity: "base",
+          })
+        );
+    }
+
     const companyName = portalConfig?.companyName || form.company;
 
     if (!companyName) return [];
@@ -167,7 +193,7 @@ export default function RequestForm({
           sensitivity: "base",
         })
       );
-  }, [stores, form.company, portalConfig?.companyName]);
+  }, [stores, form.company, portalConfig?.companyName, isPortalMode]);
 
   const uploadPercent = uploadProgress
     ? Math.round((uploadProgress.current / uploadProgress.total) * 100)
@@ -240,10 +266,21 @@ export default function RequestForm({
       return;
     }
 
-    const selectedStore = stores.find(
-      (store) =>
-        store.company_name === companyName && store.store_name === storeName
-    );
+    const selectedStore = isPortalMode
+      ? stores.find((store) => store.store_name === storeName)
+      : stores.find(
+          (store) =>
+            store.company_name === companyName && store.store_name === storeName
+        );
+
+    if (isPortalMode && !selectedStore) {
+      alert(az.validationPortal);
+      return;
+    }
+
+    const storeLabel = selectedStore
+      ? formatStoreLabel(selectedStore)
+      : storeName;
 
     setIsSubmitting(true);
 
@@ -287,7 +324,7 @@ export default function RequestForm({
       setSubmitPhase(az.submittingRequest);
 
       const taskPayload = {
-        store: storeName,
+        store: storeLabel,
         company_name: companyName,
         location: selectedStore?.location || "",
         store_id: selectedStore?.id || null,
@@ -296,7 +333,7 @@ export default function RequestForm({
         status: "Open",
         category: aiResult.ai_category,
         department: aiResult.ai_department,
-        priority: aiResult.ai_priority,
+        priority: isPortalMode ? form.priority || "Normal" : aiResult.ai_priority,
         due_date: null,
         employee_id: null,
         technician: "",
@@ -355,7 +392,20 @@ export default function RequestForm({
     <main className="portal-page">
       <section className="portal-card">
         <div style={headerStyle}>
-          <div style={logoStyle}>RS</div>
+          {isPortalMode ? (
+            <div style={portalBrandRowStyle}>
+              <ClientBrandMark
+                name={portalConfig?.companyName || ""}
+                logoUrl={portalConfig?.logoUrl}
+                size="md"
+              />
+              <span style={portalClientNameStyle}>
+                {portalConfig?.companyName}
+              </span>
+            </div>
+          ) : (
+            <div style={logoStyle}>RS</div>
+          )}
           <p style={eyebrowStyle}>{az.brand}</p>
           <h1 style={titleStyle}>{az.portalTitle}</h1>
           <p style={subtitleStyle}>
@@ -384,11 +434,30 @@ export default function RequestForm({
 
           <StoreSelect
             filteredStores={filteredStores}
-            company={portalConfig?.companyName || form.company}
+            company={portalConfig?.companyName || form.company || "portal"}
             value={form.store}
             onChange={handleChange}
             disabled={isSubmitting}
           />
+
+          {isPortalMode && (
+            <div>
+              <label style={labelStyle}>{az.priorityLabel}</label>
+              <select
+                name="priority"
+                value={form.priority}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                className="portal-field-select"
+              >
+                {PORTAL_PRIORITY_OPTIONS.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {priority}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label style={labelStyle}>{az.issueDescription}</label>
@@ -475,6 +544,23 @@ export default function RequestForm({
 const headerStyle: React.CSSProperties = {
   textAlign: "center",
   marginBottom: "32px",
+};
+
+const portalBrandRowStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "12px",
+  margin: "0 auto 16px",
+  maxWidth: "100%",
+};
+
+const portalClientNameStyle: React.CSSProperties = {
+  color: "#111827",
+  fontSize: "18px",
+  fontWeight: 700,
+  lineHeight: 1.3,
+  textAlign: "left",
 };
 
 const logoStyle: React.CSSProperties = {

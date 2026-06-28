@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getClientPortalBySlug } from "@/lib/clientPortals/getClientPortal";
+import { resolveLoginStoreIds } from "@/lib/clientPortals/resolveClientUser";
 import { validateClientLogin } from "@/lib/clientPortals/validateClientLogin";
 
 type RouteContext = {
@@ -42,6 +43,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const user = result.user;
+    const storeIds = await resolveLoginStoreIds(user);
 
     return NextResponse.json({
       session: {
@@ -51,7 +53,7 @@ export async function POST(request: Request, context: RouteContext) {
         username: user.username,
         role: user.role,
         accessLevel: user.accessLevel,
-        storeIds: user.storeIds,
+        storeIds,
       },
     });
   } catch (error) {

@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import type { Store } from "@/app/client/types/store";
 import {
+  filterStoresForAccess,
   getClientUserAccess,
   type ClientUserAccess,
   type ClientUserRecord,
 } from "@/lib/clientPortals/clientUserAccess";
+import { loadClientUserAssignedStoreIds } from "@/lib/clientPortals/clientUserStores";
 import {
   getClientPortalBySlug,
-  getCompanyStores,
+  getPortalStores,
+  resolvePortalCompanyName,
 } from "@/lib/clientPortals/getClientPortal";
+import { getSupabaseAdminClient } from "@/lib/supabase/adminClient";
 import { getClientPortalUserById } from "@/lib/clientPortals/validateClientLogin";
 
 export type ResolvedClientUserContext = {
@@ -16,6 +20,7 @@ export type ResolvedClientUserContext = {
   user: ClientUserRecord;
   stores: Store[];
   access: ClientUserAccess;
+  companyName: string;
 };
 
 export async function resolveClientUser(
@@ -52,8 +57,23 @@ export async function resolveClientUser(
     };
   }
 
-  const stores = await getCompanyStores(portal.company_name);
-  const access = getClientUserAccess(user, portal, stores);
+  const [allStores, companyName] = await Promise.all([
+    getPortalStores(portal),
+    resolvePortalCompanyName(portal),
+  ]);
+
+  const admin = getSupabaseAdminClient();
+  const assignedStoreIds = admin
+    ? await loadClientUserAssignedStoreIds(admin, user.id)
+    : [];
+
+  const portalContext = {
+    ...portal,
+    company_name: companyName,
+  };
+
+  const access = getClientUserAccess(user, portalContext, allStores, assignedStoreIds);
+  const stores = filterStoresForAccess(allStores, access);
 
   return {
     context: {
@@ -61,7 +81,30 @@ export async function resolveClientUser(
       user,
       stores,
       access,
+      companyName,
     },
     error: null,
   };
+}
+
+export async function resolveLoginStoreIds(user: {
+  id: string;
+  accessLevel: "company" | "stores";
+  storeIds: number[];
+}): Promise<number[]> {
+  const admin = getSupabaseAdminClient();
+
+  if (admin) {
+    const assignedStoreIds = await loadClientUserAssignedStoreIds(admin, user.id);
+
+    if (assignedStoreIds.length > 0) {
+      return assignedStoreIds;
+    }
+  }
+
+  if (user.accessLevel === "stores" && user.storeIds.length > 0) {
+    return user.storeIds;
+  }
+
+  return [];
 }

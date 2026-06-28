@@ -39,6 +39,23 @@
   background: #ffffff;
 }
 
+.portal-user-bar-client {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.portal-user-bar-client-name {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .portal-user-bar-info {
   display: flex;
   flex-direction: column;

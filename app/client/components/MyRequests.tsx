@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { az } from "@/app/client/i18n/az";
+import ClientBrandMark from "@/app/components/ClientBrandMark";
 import {
   getClientAuthHeaders,
   type ClientPortalSession,
@@ -29,10 +30,16 @@ export type ClientPortalRequest = {
 type MyRequestsProps = {
   slug: string;
   companyName: string;
+  logoUrl?: string | null;
   session: ClientPortalSession;
 };
 
-export default function MyRequests({ slug, companyName, session }: MyRequestsProps) {
+export default function MyRequests({
+  slug,
+  companyName,
+  logoUrl = null,
+  session,
+}: MyRequestsProps) {
   const [requests, setRequests] = useState<ClientPortalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -76,9 +83,16 @@ export default function MyRequests({ slug, companyName, session }: MyRequestsPro
       <section className="portal-card portal-card--requests">
         <div className="portal-requests-header">
           <div>
+            <div style={portalBrandRowStyle}>
+              <ClientBrandMark
+                name={companyName}
+                logoUrl={logoUrl}
+                size="md"
+              />
+              <span style={portalClientNameStyle}>{companyName}</span>
+            </div>
             <p style={eyebrowStyle}>{az.brand}</p>
             <h1 style={titleStyle}>{az.myRequestsTitle}</h1>
-            <p style={subtitleStyle}>{companyName}</p>
           </div>
 
           <button
@@ -191,10 +205,18 @@ const titleStyle: React.CSSProperties = {
   lineHeight: 1.15,
 };
 
-const subtitleStyle: React.CSSProperties = {
-  margin: 0,
-  color: "#6b7280",
-  fontSize: "15px",
+const portalBrandRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  marginBottom: "12px",
+};
+
+const portalClientNameStyle: React.CSSProperties = {
+  color: "#111827",
+  fontSize: "18px",
+  fontWeight: 700,
+  lineHeight: 1.3,
 };
 
 const messageStyle: React.CSSProperties = {

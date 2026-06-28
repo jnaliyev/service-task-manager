@@ -86,7 +86,6 @@ export async function verifyClientTaskAccess(
     .from("tasks")
     .select(select)
     .eq("id", taskId)
-    .eq("company_name", portal.company_name)
     .like("created_by", "Client Portal%")
     .maybeSingle();
 

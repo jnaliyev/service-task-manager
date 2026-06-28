@@ -92,13 +92,12 @@ export default function ClientPortalSlugPage({
 
     const stores = portalData.stores as Store[];
 
-    if (session.accessLevel === "company") {
-      return stores;
+    if (session.storeIds.length > 0) {
+      const allowedIds = new Set(session.storeIds);
+      return stores.filter((store) => allowedIds.has(store.id));
     }
 
-    const allowedIds = new Set(session.storeIds);
-
-    return stores.filter((store) => allowedIds.has(store.id));
+    return stores;
   }, [portalData, session]);
 
   if (!slug || loading || !ready) {
@@ -114,6 +113,7 @@ export default function ClientPortalSlugPage({
       <ClientLogin
         slug={slug}
         companyName={portalData.portal.companyName}
+        logoUrl={portalData.portal.logoUrl}
         onSuccess={setSession}
       />
     );
@@ -134,7 +134,12 @@ export default function ClientPortalSlugPage({
   return (
     <>
       <div className="portal-tab-bar-wrap">
-        <ClientPortalUserBar session={session} onLogout={clearSession} />
+        <ClientPortalUserBar
+          session={session}
+          companyName={portalData.portal.companyName}
+          logoUrl={portalData.portal.logoUrl}
+          onLogout={clearSession}
+        />
         <ClientPortalTabs
           activeTab={activeTab}
           onChange={setActiveTab}
@@ -149,6 +154,7 @@ export default function ClientPortalSlugPage({
           portalConfig={{
             slug: portalData.portal.slug,
             companyName: portalData.portal.companyName,
+            logoUrl: portalData.portal.logoUrl,
           }}
           clientUser={{
             fullName: session.fullName,
@@ -160,7 +166,12 @@ export default function ClientPortalSlugPage({
           }}
         />
       ) : (
-        <MyRequests slug={slug} companyName={portalData.portal.companyName} session={session} />
+        <MyRequests
+          slug={slug}
+          companyName={portalData.portal.companyName}
+          logoUrl={portalData.portal.logoUrl}
+          session={session}
+        />
       )}
     </>
   );

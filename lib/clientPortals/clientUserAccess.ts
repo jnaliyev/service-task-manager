@@ -1,4 +1,5 @@
 import type { Store } from "@/app/client/types/store";
+import { resolveEffectiveStoreIds } from "@/lib/clientPortals/clientUserStores";
 
 export const CLIENT_ACCESS_LEVELS = ["company", "stores"] as const;
 
@@ -7,6 +8,7 @@ export type ClientAccessLevel = (typeof CLIENT_ACCESS_LEVELS)[number];
 export type ClientUserRecord = {
   id: string;
   client_portal_id: string;
+  client_id?: string | null;
   full_name: string;
   username: string;
   email: string;
@@ -20,6 +22,7 @@ export type ClientUserRecord = {
 export type ClientPortalAccessContext = {
   id: string;
   company_name: string;
+  client_id?: string | null;
 };
 
 export type ClientTaskAccessTarget = {
@@ -32,6 +35,9 @@ export type ClientUserAccess = {
   userId: string;
   portalId: string;
   companyName: string;
+  clientId: string | null;
+  portalStoreIds: number[];
+  assignedStoreIds: number[];
   accessLevel: ClientAccessLevel;
   role: string;
   storeIds: number[];
@@ -98,29 +104,46 @@ function taskMatchesStoreName(
 export function getClientUserAccess(
   user: ClientUserRecord,
   portal: ClientPortalAccessContext,
-  stores: Store[] = []
+  stores: Store[] = [],
+  assignedStoreIds: number[] = []
 ): ClientUserAccess {
   const accessLevel = normalizeClientAccessLevel(user.access_level);
-  const storeIds =
-    accessLevel === "stores" ? normalizeClientUserStoreIds(user.store_ids) : [];
-  const allowedStoreNames = buildAllowedStoreNames(storeIds, stores);
+  const legacyStoreIds = normalizeClientUserStoreIds(user.store_ids);
+  const effectiveStoreIds = resolveEffectiveStoreIds(
+    assignedStoreIds,
+    accessLevel,
+    legacyStoreIds
+  );
+  const allowedStoreNames = buildAllowedStoreNames(effectiveStoreIds, stores);
   const companyName = portal.company_name.trim();
+  const clientId = portal.client_id ? String(portal.client_id) : null;
+  const portalStoreIds = stores
+    .map((store) => Number(store.id))
+    .filter((id) => Number.isFinite(id) && id > 0);
 
   function canAccessTask(task: ClientTaskAccessTarget) {
     if (!user.active) return false;
 
-    if (normalizeCompanyName(task.company_name) !== companyName.toLowerCase()) {
+    const taskStoreId = Number(task.store_id);
+    const inPortalStores =
+      portalStoreIds.length > 0 &&
+      Number.isFinite(taskStoreId) &&
+      portalStoreIds.includes(taskStoreId);
+
+    const companyMatch =
+      normalizeCompanyName(task.company_name) ===
+      normalizeCompanyName(companyName);
+
+    if (!inPortalStores && !companyMatch) {
       return false;
     }
 
-    if (accessLevel === "company") {
+    if (effectiveStoreIds.length === 0) {
       return true;
     }
 
-    const taskStoreId = Number(task.store_id);
-
     if (Number.isFinite(taskStoreId) && taskStoreId > 0) {
-      return storeIds.includes(taskStoreId);
+      return effectiveStoreIds.includes(taskStoreId);
     }
 
     const taskStore = normalizeStoreLabel(task.store);
@@ -132,9 +155,12 @@ export function getClientUserAccess(
     userId: user.id,
     portalId: portal.id,
     companyName,
+    clientId,
+    portalStoreIds,
+    assignedStoreIds: effectiveStoreIds,
     accessLevel,
     role: user.role,
-    storeIds,
+    storeIds: effectiveStoreIds,
     allowedStoreNames,
     canAccessTask,
   };
@@ -144,6 +170,11 @@ export function filterStoresForAccess<T extends { id: number }>(
   stores: T[],
   access: ClientUserAccess
 ): T[] {
+  if (access.assignedStoreIds.length > 0) {
+    const allowedIds = new Set(access.assignedStoreIds);
+    return stores.filter((store) => allowedIds.has(store.id));
+  }
+
   if (access.accessLevel === "company") {
     return stores;
   }

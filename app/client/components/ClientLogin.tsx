@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { az } from "@/app/client/i18n/az";
+import ClientBrandMark from "@/app/components/ClientBrandMark";
 import type { ClientPortalSession } from "@/lib/clientPortals/clientSession";
 
 type ClientLoginProps = {
   slug: string;
   companyName: string;
+  logoUrl?: string | null;
   onSuccess: (session: ClientPortalSession) => void;
 };
 
 export default function ClientLogin({
   slug,
   companyName,
+  logoUrl = null,
   onSuccess,
 }: ClientLoginProps) {
   const [username, setUsername] = useState("");
@@ -58,9 +61,24 @@ export default function ClientLogin({
     <main className="portal-page">
       <section className="portal-card">
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "12px",
+              marginBottom: "20px",
+            }}
+          >
+            <ClientBrandMark
+              name={companyName}
+              logoUrl={logoUrl}
+              size="lg"
+            />
+            <p style={clientNameStyle}>{companyName}</p>
+          </div>
           <p style={eyebrowStyle}>{az.brand}</p>
           <h1 style={titleStyle}>{az.loginTitle}</h1>
-          <p style={subtitleStyle}>{companyName}</p>
         </div>
 
         <form onSubmit={(event) => void handleSubmit(event)} style={formStyle}>
@@ -105,6 +123,14 @@ export default function ClientLogin({
   );
 }
 
+const clientNameStyle: React.CSSProperties = {
+  margin: 0,
+  color: "#111827",
+  fontSize: "18px",
+  fontWeight: 700,
+  lineHeight: 1.3,
+};
+
 const eyebrowStyle: React.CSSProperties = {
   margin: "0 0 4px",
   color: "#6b7280",
@@ -119,12 +145,6 @@ const titleStyle: React.CSSProperties = {
   color: "#111827",
   fontSize: "clamp(1.5rem, 4vw, 1.875rem)",
   lineHeight: 1.15,
-};
-
-const subtitleStyle: React.CSSProperties = {
-  margin: 0,
-  color: "#6b7280",
-  fontSize: "15px",
 };
 
 const formStyle: React.CSSProperties = {

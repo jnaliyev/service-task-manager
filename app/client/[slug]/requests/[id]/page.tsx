@@ -53,6 +53,7 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
   const [slug, setSlug] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [request, setRequest] = useState<ClientRequestDetail | null>(null);
@@ -131,9 +132,10 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
 
         if (response.ok) {
           const data = (await response.json()) as {
-            portal: { companyName: string };
+            portal: { companyName: string; logoUrl?: string | null };
           };
           setCompanyName(data.portal.companyName);
+          setLogoUrl(data.portal.logoUrl ?? null);
         }
       } catch (error) {
         console.error(error);
@@ -163,6 +165,7 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
       <ClientLogin
         slug={slug}
         companyName={companyName || slug}
+        logoUrl={logoUrl}
         onSuccess={setSession}
       />
     );
@@ -181,7 +184,12 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
   return (
     <main className="portal-page">
       <section className="portal-card portal-card--requests">
-        <ClientPortalUserBar session={session} onLogout={clearSession} />
+        <ClientPortalUserBar
+          session={session}
+          companyName={companyName || slug}
+          logoUrl={logoUrl}
+          onLogout={clearSession}
+        />
 
         <Link href={`/client/${slug}`} className="portal-back-link">
           ← {az.backToPortal}

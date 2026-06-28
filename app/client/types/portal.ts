@@ -4,6 +4,7 @@ export type ClientPortalRecord = {
   id: string;
   slug: string;
   company_name: string;
+  client_id?: string | null;
   store_id: string | null;
   token: string | null;
   active: boolean;
@@ -13,6 +14,8 @@ export type ClientPortalRecord = {
 export type ClientPortalConfig = {
   slug: string;
   companyName: string;
+  clientId?: string | null;
+  logoUrl?: string | null;
 };
 
 export type ClientPortalApiResponse = {

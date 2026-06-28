@@ -8,6 +8,7 @@ import TaskTable from "../components/TaskTable";
 import TaskForm from "../components/TaskForm";
 import AIAnalysisCard from "../components/AIAnalysisCard";
 import NotificationBell from "./components/NotificationBell";
+import DashboardKpiCard from "./components/DashboardKpiCard";
 import ClientRequestToast from "./components/ClientRequestToast";
 import ErpMessageToast from "./components/ErpMessageToast";
 import TaskMessagesPanel, {
@@ -58,6 +59,7 @@ created_by?: string;
     company_name: string;
     store_name: string;
     location: string;
+    clients?: { client_name: string | null } | null;
   };
   attachments?: string[] | string | null;
   client_description?: string | null;
@@ -85,6 +87,123 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
+
+type TaskStoreRecord = {
+  id: number;
+  company_name?: string | null;
+  store_name?: string | null;
+  location?: string | null;
+  store_code?: string | null;
+  client_id?: number | string | null;
+  clients?: { client_name: string | null } | { client_name: string | null }[] | null;
+};
+
+type TaskClientOption = {
+  id: number | string;
+  client_name: string | null;
+};
+
+function normalizeJoinedClient(
+  clients: TaskStoreRecord["clients"]
+): { client_name: string | null } | null {
+  if (!clients) return null;
+  return Array.isArray(clients) ? clients[0] ?? null : clients;
+}
+
+function getStoreClientName(store: TaskStoreRecord): string {
+  const clientName = normalizeJoinedClient(store.clients)?.client_name?.trim();
+  return clientName || store.company_name?.trim() || "";
+}
+
+function getTaskCompanyName(task: Task): string {
+  const clientName = normalizeJoinedClient(
+    (task.stores as TaskStoreRecord | undefined)?.clients
+  )?.client_name?.trim();
+
+  if (clientName) return clientName;
+
+  const storeCompanyName = task.stores?.company_name?.trim();
+  if (storeCompanyName) return storeCompanyName;
+
+  return task.company_name?.trim() || "";
+}
+
+type TaskStoreLookup = {
+  id: number;
+  store_name: string | null;
+  location: string | null;
+  company_name: string | null;
+  client_id: number | string | null;
+};
+
+type TaskClientLookup = {
+  id: number | string;
+  client_name: string | null;
+};
+
+function attachStoresToTasks(
+  taskRows: Task[],
+  storeRows: TaskStoreLookup[],
+  clientRows: TaskClientLookup[]
+): Task[] {
+  const storeById = new Map<number, TaskStoreLookup>();
+
+  for (const store of storeRows) {
+    storeById.set(Number(store.id), store);
+  }
+
+  const clientById = new Map<string, TaskClientLookup>();
+
+  for (const client of clientRows) {
+    clientById.set(String(client.id), client);
+  }
+
+  return taskRows.map((task) => {
+    if (!task.store_id) {
+      return task;
+    }
+
+    const store = storeById.get(Number(task.store_id));
+    if (!store) {
+      return task;
+    }
+
+    const client =
+      store.client_id !== null && store.client_id !== ""
+        ? clientById.get(String(store.client_id))
+        : undefined;
+
+    return {
+      ...task,
+      stores: {
+        company_name: store.company_name || "",
+        store_name: store.store_name || "",
+        location: store.location || "",
+        clients: client ? { client_name: client.client_name } : null,
+      },
+    };
+  });
+}
+
+function formatTaskStoreLabel(store: TaskStoreRecord): string {
+  const clientName = getStoreClientName(store);
+  const storeName = store.store_name?.trim() || "";
+  const location = store.location?.trim() || "";
+
+  if (clientName) {
+    return `${clientName} / ${storeName} / ${location}`;
+  }
+
+  return `${storeName} / ${location}`;
+}
+
+function getTaskStoreLabel(task: Task): string {
+  if (task.stores) {
+    return formatTaskStoreLabel(task.stores as TaskStoreRecord);
+  }
+
+  return task.store || "";
+}
 
 function getTableRowBackground(
   task: Task,
@@ -244,7 +363,7 @@ function TaskAttachmentsModal({
           }}
         >
           {task.stores
-            ? `${task.stores.company_name} / ${task.stores.store_name}`
+            ? `${getTaskCompanyName(task)} / ${task.stores.store_name}`
             : task.store}
         </p>
 
@@ -602,7 +721,8 @@ const [messageUnreadByTask, setMessageUnreadByTask] = useState<
 >({});
 
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<TaskStoreRecord[]>([]);
+  const [taskClients, setTaskClients] = useState<TaskClientOption[]>([]);
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
   const isAdmin = currentEmployee?.role?.toLowerCase() === "admin";
 const isGeneral = currentEmployee?.role?.toLowerCase() === "general";
@@ -779,7 +899,7 @@ const [showReports, setShowReports] = useState(true);
   const [showQuickAddStore, setShowQuickAddStore] = useState(false);
 
 const [quickStore, setQuickStore] = useState({
-  company_name: "",
+  client_id: "",
   store_name: "",
   location: "",
   store_code: "",
@@ -794,6 +914,7 @@ const [quickStore, setQuickStore] = useState({
     category: "General",
     priority: "Medium",
     due_date: "",
+    client_name: "",
     company_name: "",
     location: "",
   });
@@ -839,6 +960,7 @@ const [quickStore, setQuickStore] = useState({
   
       loadEmployees();
       loadStores();
+      loadTaskClients();
   
       await loadTasks(employee);
     }
@@ -877,7 +999,7 @@ const [quickStore, setQuickStore] = useState({
     new Date(task.due_date) < new Date());
         const matchCompany =
   companyFilter === "All" ||
-  task.stores?.company_name === companyFilter;
+  getTaskCompanyName(task) === companyFilter;
 
   const matchLocation =
   locationFilter === "All" ||
@@ -888,7 +1010,8 @@ const [quickStore, setQuickStore] = useState({
   const matchSearch =
     task.store?.toLowerCase().includes(search) ||
     task.stores?.store_name?.toLowerCase().includes(search) ||
-    task.stores?.company_name?.toLowerCase().includes(search) ||
+    getTaskCompanyName(task).toLowerCase().includes(search) ||
+    task.company_name?.toLowerCase().includes(search) ||
     task.stores?.location?.toLowerCase().includes(search) ||
     task.issue?.toLowerCase().includes(search) ||
     task.technician?.toLowerCase().includes(search) ||
@@ -1017,22 +1140,60 @@ const paginatedTasks = filteredTasks.slice(
 
     setEmployees(data || []);
   }
+  async function loadTaskClients() {
+    const { data, error } = await supabase
+      .from("clients")
+      .select("id, client_name")
+      .eq("status", "Active")
+      .order("client_name", { ascending: true });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setTaskClients(data || []);
+  }
+
   async function loadStores() {
     const { data, error } = await supabase
       .from("stores")
-      .select("*")
+      .select(
+        "id, company_name, store_name, location, store_code, client_id, clients(client_name)"
+      )
       .order("company_name", { ascending: true });
   
     if (error) {
       console.error(error);
       return;
     }
+
+    const normalizedStores: TaskStoreRecord[] = (data || []).map((store) => ({
+      id: store.id,
+      company_name: store.company_name,
+      store_name: store.store_name,
+      location: store.location,
+      store_code: store.store_code,
+      client_id: store.client_id,
+      clients: Array.isArray(store.clients) ? store.clients[0] ?? null : store.clients,
+    }));
   
-    setStores(data || []);
+    setStores(normalizedStores);
   }
   async function quickAddStore() {
-    if (!quickStore.company_name || !quickStore.store_name || !quickStore.location) {
-      alert("Please fill Company Name, Store Name and Location");
+    const selectedClient = taskClients.find(
+      (client) => String(client.id) === quickStore.client_id
+    );
+    const clientName = selectedClient?.client_name?.trim() || "";
+
+    if (!quickStore.client_id || !clientName || !quickStore.store_name || !quickStore.location) {
+      alert("Please select a Client and fill Store Name and Location");
+      return;
+    }
+
+    const clientId = Number(quickStore.client_id);
+    if (!Number.isFinite(clientId)) {
+      alert("Invalid client selection");
       return;
     }
   
@@ -1040,13 +1201,16 @@ const paginatedTasks = filteredTasks.slice(
       .from("stores")
       .insert([
         {
-          company_name: quickStore.company_name.trim(),
+          client_id: clientId,
+          company_name: clientName,
           store_name: quickStore.store_name.trim(),
           location: quickStore.location.trim(),
           store_code: quickStore.store_code.trim(),
         },
       ])
-      .select("*")
+      .select(
+        "id, company_name, store_name, location, store_code, client_id, clients(client_name)"
+      )
       .single();
   
     if (error) {
@@ -1054,19 +1218,30 @@ const paginatedTasks = filteredTasks.slice(
       alert("Error adding store");
       return;
     }
+
+    const normalizedStore: TaskStoreRecord = {
+      id: data.id,
+      company_name: data.company_name,
+      store_name: data.store_name,
+      location: data.location,
+      store_code: data.store_code,
+      client_id: data.client_id,
+      clients: Array.isArray(data.clients) ? data.clients[0] ?? null : data.clients,
+    };
   
     await loadStores();
   
     setNewTask({
       ...newTask,
-      store_id: String(data.id),
-      store: `${data.company_name} / ${data.store_name} / ${data.location}`,
-      company_name: data.company_name || "",
-      location: data.location || "",
+      store_id: String(normalizedStore.id),
+      store: formatTaskStoreLabel(normalizedStore),
+      client_name: getStoreClientName(normalizedStore),
+      company_name: getStoreClientName(normalizedStore),
+      location: normalizedStore.location || "",
     });
   
     setQuickStore({
-      company_name: "",
+      client_id: "",
       store_name: "",
       location: "",
       store_code: "",
@@ -1095,20 +1270,45 @@ const paginatedTasks = filteredTasks.slice(
     } else if (role === "manager" && department !== "general") {
       query = query.eq("department", employee?.department);
     }
+
+    const [tasksResult, storesResult, clientsResult] = await Promise.all([
+      query,
+      supabase
+        .from("stores")
+        .select("id, store_name, location, company_name, client_id"),
+      supabase.from("clients").select("id, client_name"),
+    ]);
   
-    const { data, error } = await query;
-  
-    if (error) {
-      console.error(error);
+    if (tasksResult.error) {
+      console.error(tasksResult.error);
       return;
     }
-  
-    setTasks(data || []);
+
+    if (storesResult.error) {
+      console.error(storesResult.error);
+    }
+
+    if (clientsResult.error) {
+      console.error(clientsResult.error);
+    }
+
+    const mergedTasks = attachStoresToTasks(
+      (tasksResult.data || []) as Task[],
+      (storesResult.data || []) as TaskStoreLookup[],
+      (clientsResult.data || []) as TaskClientLookup[]
+    );
+
+    setTasks(mergedTasks);
   }
 
   async function addTask() {
     if (!newTask.store_id || !newTask.issue) {
       alert("Please fill Store and Issue");
+      return;
+    }
+
+    if (!newTask.company_name.trim()) {
+      alert("Selected store does not have a linked client");
       return;
     }
   
@@ -1197,6 +1397,7 @@ const paginatedTasks = filteredTasks.slice(
       category: "General",
       priority: "Medium",
       due_date: "",
+      client_name: "",
       company_name: "",
       location: "",
     });
@@ -1289,8 +1490,8 @@ const paginatedTasks = filteredTasks.slice(
   
       rows = filteredTasks.map((task) => [
         task.store,
-        task.stores?.company_name || "",
-        task.stores?.location || "",
+        getTaskCompanyName(task),
+        task.stores?.location || task.location || "",
         task.issue,
         task.category,
         task.priority,
@@ -1323,17 +1524,12 @@ const paginatedTasks = filteredTasks.slice(
       headers = ["Company", "Total Tasks", "Open", "Completed"];
     
       const grouped = [
-        ...new Set(
-          filteredTasks.map(
-            (t) => t.stores?.company_name || t.company_name
-          )
-        ),
+        ...new Set(filteredTasks.map((t) => getTaskCompanyName(t))),
       ].filter(Boolean);
     
       rows = grouped.map((company) => {
         const companyTasks = filteredTasks.filter(
-          (t) =>
-            (t.stores?.company_name || t.company_name) === company
+          (t) => getTaskCompanyName(t) === company
         );
     
         return [
@@ -1517,205 +1713,187 @@ return (
       transition: "0.3s",
     }}
   >
-    <div
+    <header
       style={{
-        marginBottom: 20,
-        display: "flex",
-        gap: 12,
-        flexWrap: "wrap",
+        background: panelBg,
+        borderRadius: "16px",
+        padding: "24px 28px",
+        marginBottom: "24px",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+        border: `1px solid ${borderColor}`,
       }}
     >
-      <a
-        href="/dashboard/inventory"
-        style={{
-          background: "#111827",
-          color: "white",
-          padding: "12px 18px",
-          borderRadius: 10,
-          textDecoration: "none",
-          fontWeight: 700,
-          display: "inline-block",
-        }}
-      >
-        📦 Inventory Projects
-      </a>
-      <a
-        href="/dashboard/stores"
-        style={{
-          background: "#111827",
-          color: "white",
-          padding: "12px 18px",
-          borderRadius: 10,
-          textDecoration: "none",
-          fontWeight: 700,
-          display: "inline-block",
-        }}
-      >
-        🏪 Stores
-      </a>
-    </div>
-
-
       <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "30px",
-  }}
->
-<div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-  <img
-    src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg"
-    alt="logo"
-    style={{
-      width: "50px",
-      height: "50px",
-    }}
-  />
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: "20px",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              fontSize: "clamp(26px, 4vw, 36px)",
+              margin: 0,
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Retail Systems ERP
+          </h1>
+          <p
+            style={{
+              margin: "6px 0 0",
+              color: "#64748b",
+              fontSize: "14px",
+            }}
+          >
+            Service Management Platform
+          </p>
+          {currentEmployee && (
+            <p
+              style={{
+                margin: "10px 0 0",
+                color: "#111827",
+                fontSize: "15px",
+                fontWeight: 600,
+              }}
+            >
+              Welcome back, {getFirstName(currentEmployee.full_name)}!
+            </p>
+          )}
+        </div>
 
-  <div>
-    <h1
-      style={{
-        fontSize: "clamp(28px, 5vw, 42px)",
-        margin: 0,
-      }}
-    >
-      Retail Systems
-    </h1>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "14px",
+            flexWrap: "wrap",
+          }}
+        >
+          {(isAdmin || isGeneral) && (
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadCount}
+              isOpen={isPanelOpen}
+              onOpen={openPanel}
+              onClose={closePanel}
+              onOpenTask={handleOpenTaskFromNotification}
+              onDismiss={dismissNotification}
+            />
+          )}
 
-    <p
-      style={{
-        margin: 0,
-        color: "#64748b",
-        fontSize: "14px",
-      }}
-    >
-      Service Management Platform
-    </p>
-  </div>
-</div>
+          {currentEmployee && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: "2px",
+                padding: "8px 14px",
+                borderRadius: "12px",
+                background: darkMode ? "#334155" : "#f9fafb",
+                border: `1px solid ${borderColor}`,
+              }}
+            >
+              <span style={{ fontSize: "14px", fontWeight: 700 }}>
+                {currentEmployee.full_name}
+              </span>
+              <span style={{ fontSize: "12px", color: "#64748b" }}>
+                {currentEmployee.role}
+              </span>
+            </div>
+          )}
 
-<div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-  {(isAdmin || isGeneral) && (
-    <NotificationBell
-      notifications={notifications}
-      unreadCount={unreadCount}
-      isOpen={isPanelOpen}
-      onOpen={openPanel}
-      onClose={closePanel}
-      onOpenTask={handleOpenTaskFromNotification}
-      onDismiss={dismissNotification}
-    />
-  )}
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.href = "/";
+            }}
+            style={{
+              background: "#dc2626",
+              color: "white",
+              padding: "12px 20px",
+              border: "none",
+              borderRadius: "10px",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "14px",
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
 
-  <button
-    onClick={async () => {
-      await supabase.auth.signOut();
-      window.location.href = "/";
-    }}
-    style={{
-      background: "#dc2626",
-      color: "white",
-      padding: "12px 20px",
-      border: "none",
-      borderRadius: "10px",
-      cursor: "pointer",
-    }}
-  >
-    Logout
-  </button>
-</div>
-</div>
-{currentEmployee && (
-  <div
-    style={{
-      background: panelBg,
-      padding: "12px 18px",
-      borderRadius: "10px",
-      marginBottom: "20px",
-      color: textColor,
-    }}
-  >
-    Logged in as: {currentEmployee.full_name} / Role: {currentEmployee.role}
-  </div>
-)}
+      <nav
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "12px",
+          marginTop: "24px",
+        }}
+        aria-label="Dashboard navigation"
+      >
+        <DashboardNavLink href="/dashboard" icon="📋" label="Tasks" active />
+        <DashboardNavLink href="/dashboard/clients" icon="👥" label="Clients" />
+        <DashboardNavLink href="/dashboard/stores" icon="🏪" label="Stores" />
+        <DashboardNavLink href="/dashboard" icon="👤" label="Employees" />
+        <DashboardNavLink
+          href="/dashboard/inventory"
+          icon="📦"
+          label="Inventory"
+        />
+      </nav>
+    </header>
 
 <div
   style={{
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-    gap: "10px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "16px",
     marginTop: "10px",
   }}
 >
-<div
-  onClick={() => {
-    setTopKpiFilter(topKpiFilter === "open" ? "All" : "open");
-    setCurrentPage(1);
-  }}
-  style={{
-    ...cardStyle,
-    cursor: "pointer",
-    border:
-      topKpiFilter === "open"
-        ? "2px solid #2563eb"
-        : "1px solid #e5e7eb",
-  }}
->
-  <h3>Open Tasks</h3>
-  <p style={numberStyle}>
-    {tasks.filter((t) => t.status !== "Completed").length}
-  </p>
-</div>
-<div
-  onClick={() => {
-    setTopKpiFilter("All");
-    setStatusFilter("All");
-    setEmployeeFilter("All");
-    setCategoryFilter("All");
-    setCompanyFilter("All");
-    setLocationFilter("All");
-    setSearchText("");
-    setCurrentPage(1);
-  }}
-  style={{
-    ...cardStyle,
-    cursor: "pointer",
-    border:
-      topKpiFilter === "All"
-        ? "2px solid #2563eb"
-        : "1px solid #e5e7eb",
-  }}
->
-  <h3>Total Tasks</h3>
-  <p style={numberStyle}>{totalKpiTasks}</p>
-</div>
+  <DashboardKpiCard
+    icon="📋"
+    title="Open Tasks"
+    value={tasks.filter((t) => t.status !== "Completed").length}
+    helperText="Active work orders"
+    accent="blue"
+    active={topKpiFilter === "open"}
+    onClick={() => {
+      setTopKpiFilter(topKpiFilter === "open" ? "All" : "open");
+      setCurrentPage(1);
+    }}
+  />
 
-<div
-  onClick={() => {
-    setTopKpiFilter(
-      topKpiFilter === "overdue"
-        ? "All"
-        : "overdue"
-    );
+  <DashboardKpiCard
+    icon="📊"
+    title="Total Tasks"
+    value={totalKpiTasks}
+    helperText="All recorded tasks"
+    accent="blue"
+    active={topKpiFilter === "All"}
+    onClick={() => {
+      setTopKpiFilter("All");
+      setStatusFilter("All");
+      setEmployeeFilter("All");
+      setCategoryFilter("All");
+      setCompanyFilter("All");
+      setLocationFilter("All");
+      setSearchText("");
+      setCurrentPage(1);
+    }}
+  />
 
-    setCurrentPage(1);
-  }}
-  style={{
-    ...cardStyle,
-    cursor: "pointer",
-    background: "#fee2e2",
-    border:
-      topKpiFilter === "overdue"
-        ? "2px solid #2563eb"
-        : "2px solid #dc2626",
-  }}
->
-  <h3>Overdue</h3>
-
-  <p style={numberStyle}>
-    {
+  <DashboardKpiCard
+    icon="⏰"
+    title="Overdue"
+    value={
       tasks.filter(
         (task) =>
           task.due_date &&
@@ -1723,39 +1901,48 @@ return (
           task.status !== "Completed"
       ).length
     }
-  </p>
+    helperText="Needs attention"
+    accent="red"
+    warning
+    active={topKpiFilter === "overdue"}
+    onClick={() => {
+      setTopKpiFilter(topKpiFilter === "overdue" ? "All" : "overdue");
+      setCurrentPage(1);
+    }}
+  />
+
+  <DashboardKpiCard
+    icon="🔥"
+    title="Urgent"
+    value={tasks.filter((t) => t.priority === "Urgent").length}
+    helperText="High priority tasks"
+    accent="orange"
+    active={topKpiFilter === "urgent"}
+    onClick={() => {
+      setTopKpiFilter(topKpiFilter === "urgent" ? "All" : "urgent");
+      setCurrentPage(1);
+    }}
+  />
+
+  <DashboardKpiCard
+    icon="👤"
+    title="Employees"
+    value={employees.length}
+    helperText="Team members"
+    accent="green"
+  />
+
+  <DashboardKpiCard
+    icon="👥"
+    title="Clients"
+    value="-"
+    helperText="Company clients"
+    accent="purple"
+    onClick={() => {
+      window.location.href = "/dashboard/clients";
+    }}
+  />
 </div>
-<div
-  onClick={() => {
-    setTopKpiFilter(
-      topKpiFilter === "urgent"
-        ? "All"
-        : "urgent"
-    );
-
-    setCurrentPage(1);
-  }}
-  style={{
-    ...cardStyle,
-    cursor: "pointer",
-    border:
-      topKpiFilter === "urgent"
-        ? "2px solid #2563eb"
-        : "1px solid #e5e7eb",
-  }}
->
-  <h3>Urgent</h3>
-
-  <p style={numberStyle}>
-    {tasks.filter((t) => t.priority === "Urgent").length}
-  </p>
-</div>
-
-        <div style={cardStyle}>
-          <h3>Employees</h3>
-          <p style={numberStyle}>{employees.length}</p>
-        </div>
-      </div>
       <div
   style={{
     ...panelStyle,
@@ -2092,14 +2279,14 @@ color: textColor,
           const selectedStore = stores.find(
             (store) => store.id.toString() === e.target.value
           );
+          const clientName = selectedStore ? getStoreClientName(selectedStore) : "";
 
           setNewTask({
             ...newTask,
             store_id: e.target.value,
-            store: selectedStore
-              ? `${selectedStore.company_name} / ${selectedStore.store_name} / ${selectedStore.location}`
-              : "",
-            company_name: selectedStore?.company_name || "",
+            store: selectedStore ? formatTaskStoreLabel(selectedStore) : "",
+            client_name: clientName,
+            company_name: clientName,
             location: selectedStore?.location || "",
           });
         }}
@@ -2108,18 +2295,21 @@ color: textColor,
         <option value="">Select store</option>
 
         {stores
-          .filter((store) =>
-            `${store.company_name} ${store.store_name} ${store.location}`
+          .filter((store) => {
+            const clientName = getStoreClientName(store);
+            return `${clientName} ${store.store_name || ""} ${store.location || ""}`
               .toLowerCase()
-              .includes(storeSearchText.toLowerCase())
-          )
+              .includes(storeSearchText.toLowerCase());
+          })
           .map((store) => {
-            if (!store.company_name || !store.store_name || !store.location)
-              return null;
+            if (!store.store_name || !store.location) return null;
+
+            const clientName = getStoreClientName(store);
 
             return (
               <option key={store.id} value={store.id}>
-                {store.company_name} / {store.store_name} / {store.location}
+                {clientName ? `${clientName} / ` : ""}
+                {store.store_name} / {store.location}
               </option>
             );
           })}
@@ -2150,17 +2340,23 @@ color: textColor,
     gap: "12px",
   }}
 >
-  <input
-    placeholder="Company Name"
-    value={quickStore.company_name}
+  <select
+    value={quickStore.client_id}
     onChange={(e) =>
       setQuickStore({
         ...quickStore,
-        company_name: e.target.value,
+        client_id: e.target.value,
       })
     }
     style={inputStyle}
-  />
+  >
+    <option value="">Select Client</option>
+    {taskClients.map((client) => (
+      <option key={String(client.id)} value={String(client.id)}>
+        {client.client_name?.trim() || "Unnamed Client"}
+      </option>
+    ))}
+  </select>
 
   <input
     placeholder="Store Name"
@@ -2211,6 +2407,22 @@ color: textColor,
 </div>
 )}
 </div>
+
+  <div>
+    <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
+      Client
+    </label>
+    <input
+      readOnly
+      value={newTask.client_name || "Select a store to load client"}
+      style={{
+        ...inputStyle,
+        background: darkMode ? "#1e293b" : "#f8fafc",
+        color: darkMode ? "#cbd5e1" : "#475569",
+        cursor: "not-allowed",
+      }}
+    />
+  </div>
 
   <div>
     <label style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}>
@@ -2501,7 +2713,7 @@ color: textColor,
 >
   <option value="All">All companies</option>
 
-  {[...new Set(tasks.map((t) => t.stores?.company_name))]
+  {[...new Set(tasks.map((t) => getTaskCompanyName(t)))]
     .filter(Boolean)
     .map((company) => (
       <option key={company} value={company}>
@@ -2518,7 +2730,7 @@ color: textColor,
   <option value="All">All locations</option>
 
   {[...new Set(stores.map((s) => s.location))]
-  .filter(Boolean)
+  .filter((location): location is string => Boolean(location))
   .map((location) => (
       <option key={location} value={location}>
         {location}
@@ -2831,19 +3043,11 @@ color: textColor,
       <tbody>
         {[
           ...new Set(
-            filteredTasks
-              .map(
-                (task) =>
-                  task.stores?.company_name ||
-                  task.company_name
-              )
-              .filter(Boolean)
+            filteredTasks.map((task) => getTaskCompanyName(task)).filter(Boolean)
           ),
         ].map((company) => {
           const companyTasks = filteredTasks.filter(
-            (task) =>
-              (task.stores?.company_name ||
-                task.company_name) === company
+            (task) => getTaskCompanyName(task) === company
           );
 
           return (
@@ -2904,23 +3108,12 @@ color: textColor,
       <tbody>
         {[
           ...new Set(
-            filteredTasks
-              .map(
-                (task) =>
-                  task.stores
-                    ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
-                    : task.store
-              )
-              .filter(Boolean)
+            filteredTasks.map((task) => getTaskStoreLabel(task)).filter(Boolean)
           ),
         ].map((store) => {
-          const storeTasks = filteredTasks.filter((task) => {
-            const taskStore = task.stores
-              ? `${task.stores.company_name} / ${task.stores.store_name} / ${task.stores.location}`
-              : task.store;
-
-            return taskStore === store;
-          });
+          const storeTasks = filteredTasks.filter(
+            (task) => getTaskStoreLabel(task) === store
+          );
 
           return (
             <tr key={store}>
@@ -3309,8 +3502,9 @@ photos={photos}
             category: task.category || task.department || "General",
             priority: task.priority || "Medium",
             due_date: task.due_date || "",
-            company_name: task.stores?.company_name || "",
-            location: task.stores?.location || "",
+            client_name: getTaskCompanyName(task),
+            company_name: getTaskCompanyName(task),
+            location: task.stores?.location || task.location || "",
           });
         }}
         onDelete={() => deleteTask(task.id)}
@@ -3585,6 +3779,66 @@ const buttonStyle = {
 };
 
 
+
+function getFirstName(fullName: string) {
+  const trimmed = fullName.trim();
+  if (!trimmed) return "there";
+  return trimmed.split(/\s+/)[0];
+}
+
+function DashboardNavLink({
+  href,
+  icon,
+  label,
+  active = false,
+}: {
+  href: string;
+  icon: string;
+  label: string;
+  active?: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <a
+      href={href}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        flex: "1 1 120px",
+        minWidth: "120px",
+        maxWidth: "180px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
+        padding: "14px 16px",
+        borderRadius: "14px",
+        textDecoration: "none",
+        color: "#111827",
+        background: hovered ? "#f3f4f6" : "white",
+        border: active
+          ? "2px solid #2563eb"
+          : hovered
+            ? "1px solid #cbd5e1"
+            : "1px solid #e5e7eb",
+        boxShadow: hovered
+          ? "0 8px 20px rgba(15, 23, 42, 0.08)"
+          : "0 2px 8px rgba(15, 23, 42, 0.04)",
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        transition: "transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease",
+        fontWeight: 600,
+        fontSize: "14px",
+      }}
+    >
+      <span style={{ fontSize: "22px", lineHeight: 1 }} aria-hidden="true">
+        {icon}
+      </span>
+      <span>{label}</span>
+    </a>
+  );
+}
 
 function getStatusColor(status: string) {
   if (status === "Completed") return "green";
