@@ -44,11 +44,11 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const rawClientId = searchParams.get("clientId");
-    const clientId = parseNumericClientId(rawClientId);
-
-    if (clientId == null) {
+    const clientId = rawClientId?.trim();
+    
+    if (!clientId) {
       return NextResponse.json(
-        { error: "A numeric clientId is required" },
+        { error: "clientId is required" },
         { status: 400 }
       );
     }
@@ -63,7 +63,6 @@ export async function GET(request: Request) {
     const clientName = getClientName(client);
     const logoUrl = getClientLogoUrl(client);
 
-    await deduplicateClientPortals(supabase, resolvedClientId, clientName);
 
     const info = await getClientPortalAccessInfo(
       supabase,

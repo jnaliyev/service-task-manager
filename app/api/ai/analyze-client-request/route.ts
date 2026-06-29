@@ -74,6 +74,10 @@ MAPPING EXAMPLES:
 - sign, lightbox, branding, logo, wayfinding -> Construction / Signage
 - inventory -> Inventory / Inventory
 
+VERY IMPORTANT AZERBAIJANI KEYWORDS:
+- boya, boya işi, boya işləri, rəngləmə, divar boyası, tavan boyası, paint, painting, touch-up -> Construction / Painting
+- Never classify boya-related requests as Signage.
+
 Use "Medium" priority unless safety, revenue impact, or complete outage clearly requires otherwise.`;
 
   if (hasImages) {
@@ -150,6 +154,7 @@ export async function POST(request: Request) {
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
+      temperature: 0,
       response_format: { type: "json_object" },
       messages: [
         {
