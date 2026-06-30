@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { WORKFLOW_LABELS, type WorkflowStatus } from "@/lib/workflow";
 type Props = {
     task: any;
     buttonStyle: React.CSSProperties;
@@ -150,6 +151,24 @@ type Props = {
     <option>Completed</option>
   </select>
 </div>
+        <p style={{ marginTop: "10px", marginBottom: "10px" }}>
+          <b>Workflow:</b>{" "}
+          <span
+            style={{
+              background: "#e0e7ff",
+              color: "#3730a3",
+              padding: "4px 8px",
+              borderRadius: "999px",
+              fontSize: "11px",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {task.workflow_status && task.workflow_status in WORKFLOW_LABELS
+              ? WORKFLOW_LABELS[task.workflow_status as WorkflowStatus]
+              : WORKFLOW_LABELS.new_request}
+          </span>
+        </p>
         <p><b>Priority:</b> {task.priority}</p>
         <p><b>Technician:</b> {task.technician}</p>
         {task.status !== "Completed" && (

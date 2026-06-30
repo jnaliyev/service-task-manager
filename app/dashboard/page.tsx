@@ -21,6 +21,7 @@ import {
   playNotificationSound,
   unlockNotificationSound,
 } from "@/lib/notifications/playNotificationSound";
+import { WORKFLOW_LABELS, type WorkflowStatus } from "@/lib/workflow";
 
 type Employee = {
   id: string;
@@ -39,6 +40,7 @@ type Task = {
  company_name?: string;
 location?: string;
   status: string;
+  workflow_status?: string | null;
   category?: string;
   department?: string;
 assigned_to?: string;
@@ -3358,6 +3360,7 @@ photos={photos}
               <th style={thStyle}>Due Date</th>
               <th style={thStyle}>Assigned To</th>
               <th style={thStyle}>Status</th>
+              <th style={thStyle}>Workflow</th>
               <th style={thStyle}>Created</th>
               <th style={thStyle}>Action</th>
             </tr>
@@ -3461,6 +3464,23 @@ photos={photos}
 </span>
 )}
 
+    </td>
+    <td style={tdStyle}>
+    <span
+      style={{
+        background: "#e0e7ff",
+        color: "#3730a3",
+        padding: "4px 8px",
+        borderRadius: "999px",
+        fontSize: "11px",
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {task.workflow_status && task.workflow_status in WORKFLOW_LABELS
+        ? WORKFLOW_LABELS[task.workflow_status as WorkflowStatus]
+        : WORKFLOW_LABELS.new_request}
+    </span>
     </td>
     <td style={tdStyle}>
   {task.created_at
