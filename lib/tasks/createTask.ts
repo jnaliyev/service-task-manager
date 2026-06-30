@@ -33,7 +33,7 @@ export async function createTask(payload: CreateTaskPayload) {
 
   const { data, error } = await supabase
     .from("tasks")
-    .insert([payload])
+    .insert([{ ...payload, workflow_status: "new_request" }])
     .select("id")
     .single();
 

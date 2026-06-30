@@ -1343,7 +1343,7 @@ const paginatedTasks = filteredTasks.slice(
           .single()
       : await supabase
           .from("tasks")
-          .insert([taskPayload])
+          .insert([{ ...taskPayload, workflow_status: "new_request" }])
           .select("id")
           .single();
   
