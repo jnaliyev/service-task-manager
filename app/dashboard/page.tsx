@@ -43,6 +43,7 @@ location?: string;
   workflow_status?: string | null;
   accepted_at?: string | null;
   inspection_at?: string | null;
+  quotation_sent_at?: string | null;
   category?: string;
   department?: string;
 assigned_to?: string;
@@ -527,6 +528,8 @@ function TaskActionsDropdown({
   onAcceptRequest,
   showStartSiteInspection,
   onStartSiteInspection,
+  showSendQuotation,
+  onSendQuotation,
 }: {
   task: Task;
   darkMode: boolean;
@@ -547,6 +550,8 @@ function TaskActionsDropdown({
   onAcceptRequest: () => void;
   showStartSiteInspection: boolean;
   onStartSiteInspection: () => void;
+  showSendQuotation: boolean;
+  onSendQuotation: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -661,6 +666,7 @@ Created By: ${task.created_by || "Retail Systems"}`
           {showAcceptRequest && renderMenuItem("Accept Request", onAcceptRequest)}
           {showStartSiteInspection &&
             renderMenuItem("Start Site Inspection", onStartSiteInspection)}
+          {showSendQuotation && renderMenuItem("Send Quotation", onSendQuotation)}
           {showEdit && renderMenuItem("Edit", onEdit)}
           {renderMenuItem("WhatsApp", () => {}, {
             isLink: true,
@@ -1531,6 +1537,47 @@ const paginatedTasks = filteredTasks.slice(
     if (error) {
       console.error(error);
       alert("Error while starting site inspection");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
+  }
+
+  async function sendQuotation(taskId: number) {
+    const quotationSentAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              workflow_status: "quotation_sent",
+              quotation_sent_at: quotationSentAt,
+            }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "quotation_sent",
+        quotation_sent_at: quotationSentAt,
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while sending quotation");
       if (currentEmployee) {
         loadTasks(currentEmployee);
       } else {
@@ -3597,6 +3644,8 @@ photos={photos}
         onAcceptRequest={() => acceptRequest(task.id)}
         showStartSiteInspection={task.workflow_status === "accepted"}
         onStartSiteInspection={() => startSiteInspection(task.id)}
+        showSendQuotation={task.workflow_status === "site_inspection"}
+        onSendQuotation={() => sendQuotation(task.id)}
         onComments={() => {
           setSelectedTask(task);
           setSelectedTaskId(task.id.toString());
