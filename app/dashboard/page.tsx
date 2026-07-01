@@ -41,6 +41,7 @@ type Task = {
 location?: string;
   status: string;
   workflow_status?: string | null;
+  accepted_at?: string | null;
   category?: string;
   department?: string;
 assigned_to?: string;
@@ -521,6 +522,8 @@ function TaskActionsDropdown({
   onEdit,
   onDelete,
   onUploadPhoto,
+  showAcceptRequest,
+  onAcceptRequest,
 }: {
   task: Task;
   darkMode: boolean;
@@ -537,6 +540,8 @@ function TaskActionsDropdown({
   onEdit: () => void;
   onDelete: () => void;
   onUploadPhoto: (file: File) => Promise<void>;
+  showAcceptRequest: boolean;
+  onAcceptRequest: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -648,6 +653,7 @@ Created By: ${task.created_by || "Retail Systems"}`
           {renderMenuItem("Comments", onComments)}
           {showPhotos && renderMenuItem("Photos", onPhotos)}
           {showAiAnalysis && renderMenuItem("AI Analysis", onAiAnalysis)}
+          {showAcceptRequest && renderMenuItem("Accept Request", onAcceptRequest)}
           {showEdit && renderMenuItem("Edit", onEdit)}
           {renderMenuItem("WhatsApp", () => {}, {
             isLink: true,
@@ -1452,6 +1458,43 @@ const paginatedTasks = filteredTasks.slice(
   
     if (currentEmployee) {
       loadTasks(currentEmployee);
+    }
+  }
+
+  async function acceptRequest(taskId: number) {
+    const acceptedAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? { ...task, workflow_status: "accepted", accepted_at: acceptedAt }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "accepted",
+        accepted_at: acceptedAt,
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while accepting request");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
     }
   }
   
@@ -3500,6 +3543,10 @@ photos={photos}
         showDelete={currentEmployee?.role?.toLowerCase() === "admin"}
         showPhotos={getTaskAttachmentUrls(task.attachments).length > 0}
         showAiAnalysis={Boolean(task.ai_summary?.trim())}
+        showAcceptRequest={
+          !task.workflow_status || task.workflow_status === "new_request"
+        }
+        onAcceptRequest={() => acceptRequest(task.id)}
         onComments={() => {
           setSelectedTask(task);
           setSelectedTaskId(task.id.toString());
