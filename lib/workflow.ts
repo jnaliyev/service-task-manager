@@ -7,7 +7,7 @@ export const WORKFLOW_STATUSES = [
     "approved",
     "technician_assigned",
     "in_progress",
-    "completed",
+    "finished",
     "closed",
   ] as const;
   
@@ -22,6 +22,6 @@ export const WORKFLOW_STATUSES = [
     approved: "Approved",
     technician_assigned: "Technician Assigned",
     in_progress: "In Progress",
-    completed: "Completed",
+    finished: "Finished",
     closed: "Closed",
   };

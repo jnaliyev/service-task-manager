@@ -45,6 +45,10 @@ location?: string;
   inspection_at?: string | null;
   quotation_sent_at?: string | null;
   approved_at?: string | null;
+  technician_assigned_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  closed_at?: string | null;
   category?: string;
   department?: string;
 assigned_to?: string;
@@ -533,6 +537,14 @@ function TaskActionsDropdown({
   onSendQuotation,
   showApprove,
   onApprove,
+  showAssignTechnician,
+  onAssignTechnician,
+  showStartWork,
+  onStartWork,
+  showFinishWork,
+  onFinishWork,
+  showCloseRequest,
+  onCloseRequest,
 }: {
   task: Task;
   darkMode: boolean;
@@ -557,6 +569,14 @@ function TaskActionsDropdown({
   onSendQuotation: () => void;
   showApprove: boolean;
   onApprove: () => void;
+  showAssignTechnician: boolean;
+  onAssignTechnician: () => void;
+  showStartWork: boolean;
+  onStartWork: () => void;
+  showFinishWork: boolean;
+  onFinishWork: () => void;
+  showCloseRequest: boolean;
+  onCloseRequest: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -673,6 +693,11 @@ Created By: ${task.created_by || "Retail Systems"}`
             renderMenuItem("Start Site Inspection", onStartSiteInspection)}
           {showSendQuotation && renderMenuItem("Send Quotation", onSendQuotation)}
           {showApprove && renderMenuItem("Approve", onApprove)}
+          {showAssignTechnician &&
+            renderMenuItem("Assign Technician", onAssignTechnician)}
+          {showStartWork && renderMenuItem("Start Work", onStartWork)}
+          {showFinishWork && renderMenuItem("Finish Work", onFinishWork)}
+          {showCloseRequest && renderMenuItem("Close Request", onCloseRequest)}
           {showEdit && renderMenuItem("Edit", onEdit)}
           {renderMenuItem("WhatsApp", () => {}, {
             isLink: true,
@@ -1625,6 +1650,174 @@ const paginatedTasks = filteredTasks.slice(
     if (error) {
       console.error(error);
       alert("Error while approving request");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
+  }
+
+  async function assignTechnician(taskId: number) {
+    const technicianAssignedAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              workflow_status: "technician_assigned",
+              technician_assigned_at: technicianAssignedAt,
+            }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "technician_assigned",
+        technician_assigned_at: technicianAssignedAt,
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while assigning technician");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
+  }
+
+  async function startWork(taskId: number) {
+    const startedAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              workflow_status: "in_progress",
+              started_at: startedAt,
+              status: "In Progress",
+            }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "in_progress",
+        started_at: startedAt,
+        status: "In Progress",
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while starting work");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
+  }
+
+  async function finishWork(taskId: number) {
+    const finishedAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              workflow_status: "finished",
+              finished_at: finishedAt,
+              status: "Completed",
+            }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "finished",
+        finished_at: finishedAt,
+        status: "Completed",
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while finishing work");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
+  }
+
+  async function closeRequest(taskId: number) {
+    const closedAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              workflow_status: "closed",
+              closed_at: closedAt,
+            }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "closed",
+        closed_at: closedAt,
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while closing request");
       if (currentEmployee) {
         loadTasks(currentEmployee);
       } else {
@@ -3695,6 +3888,14 @@ photos={photos}
         onSendQuotation={() => sendQuotation(task.id)}
         showApprove={task.workflow_status === "quotation_sent"}
         onApprove={() => approveRequest(task.id)}
+        showAssignTechnician={task.workflow_status === "approved"}
+        onAssignTechnician={() => assignTechnician(task.id)}
+        showStartWork={task.workflow_status === "technician_assigned"}
+        onStartWork={() => startWork(task.id)}
+        showFinishWork={task.workflow_status === "in_progress"}
+        onFinishWork={() => finishWork(task.id)}
+        showCloseRequest={task.workflow_status === "finished"}
+        onCloseRequest={() => closeRequest(task.id)}
         onComments={() => {
           setSelectedTask(task);
           setSelectedTaskId(task.id.toString());
