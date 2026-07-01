@@ -44,6 +44,7 @@ location?: string;
   accepted_at?: string | null;
   inspection_at?: string | null;
   quotation_sent_at?: string | null;
+  approved_at?: string | null;
   category?: string;
   department?: string;
 assigned_to?: string;
@@ -530,6 +531,8 @@ function TaskActionsDropdown({
   onStartSiteInspection,
   showSendQuotation,
   onSendQuotation,
+  showApprove,
+  onApprove,
 }: {
   task: Task;
   darkMode: boolean;
@@ -552,6 +555,8 @@ function TaskActionsDropdown({
   onStartSiteInspection: () => void;
   showSendQuotation: boolean;
   onSendQuotation: () => void;
+  showApprove: boolean;
+  onApprove: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -667,6 +672,7 @@ Created By: ${task.created_by || "Retail Systems"}`
           {showStartSiteInspection &&
             renderMenuItem("Start Site Inspection", onStartSiteInspection)}
           {showSendQuotation && renderMenuItem("Send Quotation", onSendQuotation)}
+          {showApprove && renderMenuItem("Approve", onApprove)}
           {showEdit && renderMenuItem("Edit", onEdit)}
           {renderMenuItem("WhatsApp", () => {}, {
             isLink: true,
@@ -1578,6 +1584,47 @@ const paginatedTasks = filteredTasks.slice(
     if (error) {
       console.error(error);
       alert("Error while sending quotation");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
+  }
+
+  async function approveRequest(taskId: number) {
+    const approvedAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              workflow_status: "approved",
+              approved_at: approvedAt,
+            }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "approved",
+        approved_at: approvedAt,
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while approving request");
       if (currentEmployee) {
         loadTasks(currentEmployee);
       } else {
@@ -3646,6 +3693,8 @@ photos={photos}
         onStartSiteInspection={() => startSiteInspection(task.id)}
         showSendQuotation={task.workflow_status === "site_inspection"}
         onSendQuotation={() => sendQuotation(task.id)}
+        showApprove={task.workflow_status === "quotation_sent"}
+        onApprove={() => approveRequest(task.id)}
         onComments={() => {
           setSelectedTask(task);
           setSelectedTaskId(task.id.toString());
