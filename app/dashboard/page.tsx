@@ -42,6 +42,7 @@ location?: string;
   status: string;
   workflow_status?: string | null;
   accepted_at?: string | null;
+  inspection_at?: string | null;
   category?: string;
   department?: string;
 assigned_to?: string;
@@ -524,6 +525,8 @@ function TaskActionsDropdown({
   onUploadPhoto,
   showAcceptRequest,
   onAcceptRequest,
+  showStartSiteInspection,
+  onStartSiteInspection,
 }: {
   task: Task;
   darkMode: boolean;
@@ -542,6 +545,8 @@ function TaskActionsDropdown({
   onUploadPhoto: (file: File) => Promise<void>;
   showAcceptRequest: boolean;
   onAcceptRequest: () => void;
+  showStartSiteInspection: boolean;
+  onStartSiteInspection: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -654,6 +659,8 @@ Created By: ${task.created_by || "Retail Systems"}`
           {showPhotos && renderMenuItem("Photos", onPhotos)}
           {showAiAnalysis && renderMenuItem("AI Analysis", onAiAnalysis)}
           {showAcceptRequest && renderMenuItem("Accept Request", onAcceptRequest)}
+          {showStartSiteInspection &&
+            renderMenuItem("Start Site Inspection", onStartSiteInspection)}
           {showEdit && renderMenuItem("Edit", onEdit)}
           {renderMenuItem("WhatsApp", () => {}, {
             isLink: true,
@@ -1483,6 +1490,47 @@ const paginatedTasks = filteredTasks.slice(
     if (error) {
       console.error(error);
       alert("Error while accepting request");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentEmployee) {
+      loadTasks(currentEmployee);
+    } else {
+      loadTasks();
+    }
+  }
+
+  async function startSiteInspection(taskId: number) {
+    const inspectionAt = new Date().toISOString();
+
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              workflow_status: "site_inspection",
+              inspection_at: inspectionAt,
+            }
+          : task
+      )
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        workflow_status: "site_inspection",
+        inspection_at: inspectionAt,
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      console.error(error);
+      alert("Error while starting site inspection");
       if (currentEmployee) {
         loadTasks(currentEmployee);
       } else {
@@ -3547,6 +3595,8 @@ photos={photos}
           !task.workflow_status || task.workflow_status === "new_request"
         }
         onAcceptRequest={() => acceptRequest(task.id)}
+        showStartSiteInspection={task.workflow_status === "accepted"}
+        onStartSiteInspection={() => startSiteInspection(task.id)}
         onComments={() => {
           setSelectedTask(task);
           setSelectedTaskId(task.id.toString());
