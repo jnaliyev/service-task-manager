@@ -1510,7 +1510,31 @@ const paginatedTasks = filteredTasks.slice(
     }
   }
 
+  async function insertWorkflowHistory(
+    taskId: number,
+    oldStatus: string,
+    newStatus: string,
+    action: string
+  ) {
+    const { error: historyError } = await supabase.from("task_history").insert([
+      {
+        task_id: taskId,
+        old_status: oldStatus,
+        new_status: newStatus,
+        author: currentEmployee?.full_name || "Unknown",
+        action,
+      },
+    ]);
+
+    if (historyError) {
+      console.error(historyError);
+      alert("Workflow updated, but timeline history was not saved");
+    }
+  }
+
   async function acceptRequest(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const acceptedAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1540,6 +1564,13 @@ const paginatedTasks = filteredTasks.slice(
       return;
     }
 
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "accepted",
+      "Request Accepted"
+    );
+
     if (currentEmployee) {
       loadTasks(currentEmployee);
     } else {
@@ -1548,6 +1579,8 @@ const paginatedTasks = filteredTasks.slice(
   }
 
   async function startSiteInspection(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const inspectionAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1581,6 +1614,13 @@ const paginatedTasks = filteredTasks.slice(
       return;
     }
 
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "site_inspection",
+      "Site Inspection Started"
+    );
+
     if (currentEmployee) {
       loadTasks(currentEmployee);
     } else {
@@ -1589,6 +1629,8 @@ const paginatedTasks = filteredTasks.slice(
   }
 
   async function sendQuotation(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const quotationSentAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1622,6 +1664,13 @@ const paginatedTasks = filteredTasks.slice(
       return;
     }
 
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "quotation_sent",
+      "Quotation Sent"
+    );
+
     if (currentEmployee) {
       loadTasks(currentEmployee);
     } else {
@@ -1630,6 +1679,8 @@ const paginatedTasks = filteredTasks.slice(
   }
 
   async function approveRequest(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const approvedAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1663,6 +1714,13 @@ const paginatedTasks = filteredTasks.slice(
       return;
     }
 
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "approved",
+      "Request Approved"
+    );
+
     if (currentEmployee) {
       loadTasks(currentEmployee);
     } else {
@@ -1671,6 +1729,8 @@ const paginatedTasks = filteredTasks.slice(
   }
 
   async function assignTechnician(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const technicianAssignedAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1704,6 +1764,13 @@ const paginatedTasks = filteredTasks.slice(
       return;
     }
 
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "technician_assigned",
+      "Technician Assigned"
+    );
+
     if (currentEmployee) {
       loadTasks(currentEmployee);
     } else {
@@ -1712,6 +1779,8 @@ const paginatedTasks = filteredTasks.slice(
   }
 
   async function startWork(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const startedAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1747,6 +1816,13 @@ const paginatedTasks = filteredTasks.slice(
       return;
     }
 
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "in_progress",
+      "Work Started"
+    );
+
     if (currentEmployee) {
       loadTasks(currentEmployee);
     } else {
@@ -1755,6 +1831,8 @@ const paginatedTasks = filteredTasks.slice(
   }
 
   async function finishWork(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const finishedAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1790,6 +1868,13 @@ const paginatedTasks = filteredTasks.slice(
       return;
     }
 
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "finished",
+      "Work Completed"
+    );
+
     if (currentEmployee) {
       loadTasks(currentEmployee);
     } else {
@@ -1798,6 +1883,8 @@ const paginatedTasks = filteredTasks.slice(
   }
 
   async function closeRequest(taskId: number) {
+    const oldWorkflowStatus =
+      tasks.find((task) => task.id === taskId)?.workflow_status || "";
     const closedAt = new Date().toISOString();
 
     setTasks((prevTasks) =>
@@ -1830,6 +1917,13 @@ const paginatedTasks = filteredTasks.slice(
       }
       return;
     }
+
+    await insertWorkflowHistory(
+      taskId,
+      oldWorkflowStatus,
+      "closed",
+      "Request Closed"
+    );
 
     if (currentEmployee) {
       loadTasks(currentEmployee);
