@@ -1381,7 +1381,6 @@ const paginatedTasks = filteredTasks.slice(
       due_date: newTask.due_date || null,
       employee_id: newTask.employee_id || null,
       technician: selectedEmployee?.full_name || "",
-      created_by: currentEmployee?.full_name || "Retail Systems",
     };
   
     let taskId = editingTask?.id;
@@ -1395,7 +1394,13 @@ const paginatedTasks = filteredTasks.slice(
           .single()
       : await supabase
           .from("tasks")
-          .insert([{ ...taskPayload, workflow_status: "new_request" }])
+          .insert([
+            {
+              ...taskPayload,
+              created_by: currentEmployee?.full_name || "Retail Systems",
+              workflow_status: "new_request",
+            },
+          ])
           .select("id")
           .single();
   
