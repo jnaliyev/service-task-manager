@@ -43,7 +43,7 @@ export default function StoreSelect({
         </option>
 
         {filteredStores.map((store) => (
-          <option key={store.id} value={store.store_name || ""}>
+          <option key={store.id} value={String(store.id)}>
             {store.store_name}
             {store.location ? ` — ${store.location}` : ""}
           </option>

@@ -257,30 +257,26 @@ export default function RequestForm({
     event.preventDefault();
 
     const companyName = portalConfig?.companyName || form.company;
-    const storeName = form.store;
+    const storeId = Number(form.store);
     const clientDescription = form.description.trim();
     const selectedPhotos = photoItems.map((item) => item.file);
 
-    if (!companyName || !storeName || !clientDescription) {
+    if (!companyName || !form.store || !clientDescription) {
       alert(isPortalMode ? az.validationPortal : az.validationDefault);
       return;
     }
 
-    const selectedStore = isPortalMode
-      ? stores.find((store) => store.store_name === storeName)
-      : stores.find(
-          (store) =>
-            store.company_name === companyName && store.store_name === storeName
-        );
+    const selectedStore = stores.find((store) => store.id === storeId);
 
-    if (isPortalMode && !selectedStore) {
-      alert(az.validationPortal);
+    if (
+      !selectedStore ||
+      (!isPortalMode && selectedStore.company_name !== companyName)
+    ) {
+      alert(isPortalMode ? az.validationPortal : az.validationDefault);
       return;
     }
 
-    const storeLabel = selectedStore
-      ? formatStoreLabel(selectedStore)
-      : storeName;
+    const storeLabel = formatStoreLabel(selectedStore);
 
     setIsSubmitting(true);
 
@@ -326,8 +322,8 @@ export default function RequestForm({
       const taskPayload = {
         store: storeLabel,
         company_name: companyName,
-        location: selectedStore?.location || "",
-        store_id: selectedStore?.id || null,
+        location: selectedStore.location || "",
+        store_id: selectedStore.id,
         issue: clientDescription,
         client_description: clientDescription,
         status: "Open",
