@@ -34,7 +34,12 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Invalid request id" }, { status: 400 });
     }
 
-    const result = await requireClientTask(request, slug, taskId, "id");
+    const result = await requireClientTask(
+      request,
+      slug,
+      taskId,
+      "id, company_name, store_id, store"
+    );
 
     if (result.error) {
       return result.error;
@@ -78,7 +83,12 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Invalid request id" }, { status: 400 });
     }
 
-    const result = await requireClientTask(request, slug, taskId, "id");
+    const result = await requireClientTask(
+      request,
+      slug,
+      taskId,
+      "id, company_name, store_id, store"
+    );
 
     if (result.error) {
       return result.error;
