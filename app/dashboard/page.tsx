@@ -23,6 +23,54 @@ import {
 } from "@/lib/notifications/playNotificationSound";
 import { WORKFLOW_LABELS, type WorkflowStatus } from "@/lib/workflow";
 
+const WORKFLOW_SELECTOR_STATUSES = [
+  "new_request",
+  "accepted",
+  "site_inspection",
+  "quotation_sent",
+  "approved",
+  "technician_assigned",
+  "in_progress",
+  "finished",
+  "closed",
+] as const;
+
+type WorkflowSelectorStatus = (typeof WORKFLOW_SELECTOR_STATUSES)[number];
+
+const WORKFLOW_HISTORY_ACTIONS: Record<WorkflowSelectorStatus, string> = {
+  new_request: "Returned to New Request",
+  accepted: "Request Accepted",
+  site_inspection: "Site Inspection Started",
+  quotation_sent: "Quotation Sent",
+  approved: "Request Approved",
+  technician_assigned: "Technician Assigned",
+  in_progress: "Work Started",
+  finished: "Work Completed",
+  closed: "Request Closed",
+};
+
+function normalizeWorkflowStatus(
+  status: string | null | undefined
+): WorkflowSelectorStatus {
+  if (
+    status &&
+    WORKFLOW_SELECTOR_STATUSES.includes(status as WorkflowSelectorStatus)
+  ) {
+    return status as WorkflowSelectorStatus;
+  }
+  return "new_request";
+}
+
+function getTaskStatusForWorkflow(
+  targetStatus: WorkflowSelectorStatus,
+  currentTaskStatus: string
+): string {
+  if (targetStatus === "closed") return currentTaskStatus;
+  if (targetStatus === "in_progress") return "In Progress";
+  if (targetStatus === "finished") return "Completed";
+  return "Open";
+}
+
 type Employee = {
   id: string;
   full_name: string;
@@ -79,6 +127,38 @@ created_by?: string;
   ai_summary?: string | null;
   ai_confidence?: number | null;
 };
+
+type WorkflowTimestampField =
+  | "accepted_at"
+  | "inspection_at"
+  | "quotation_sent_at"
+  | "approved_at"
+  | "technician_assigned_at"
+  | "started_at"
+  | "finished_at"
+  | "closed_at";
+
+const WORKFLOW_TIMESTAMP_FIELDS: Partial<
+  Record<WorkflowSelectorStatus, WorkflowTimestampField>
+> = {
+  accepted: "accepted_at",
+  site_inspection: "inspection_at",
+  quotation_sent: "quotation_sent_at",
+  approved: "approved_at",
+  technician_assigned: "technician_assigned_at",
+  in_progress: "started_at",
+  finished: "finished_at",
+  closed: "closed_at",
+};
+
+function applyWorkflowTimestamp(
+  task: Task,
+  field: WorkflowTimestampField,
+  value: string
+): Task {
+  return { ...task, [field]: value };
+}
+
 type Comment = {
   id: string;
   task_id: string;
@@ -513,6 +593,207 @@ function TaskAiAnalysisModal({
   );
 }
 
+function TaskWorkflowStatusModal({
+  task,
+  darkMode,
+  employees,
+  onClose,
+  onSave,
+}: {
+  task: Task;
+  darkMode: boolean;
+  employees: Employee[];
+  onClose: () => void;
+  onSave: (
+    targetStatus: WorkflowSelectorStatus,
+    employeeId?: string
+  ) => Promise<void>;
+}) {
+  const currentStatus = normalizeWorkflowStatus(task.workflow_status);
+  const [targetStatus, setTargetStatus] =
+    useState<WorkflowSelectorStatus>(currentStatus);
+  const [employeeId, setEmployeeId] = useState(task.employee_id || "");
+  const [saving, setSaving] = useState(false);
+
+  const requiresTechnician = targetStatus === "technician_assigned";
+  const isSameTechnicianAssignment =
+    requiresTechnician &&
+    currentStatus === "technician_assigned" &&
+    employeeId === (task.employee_id || "");
+  const isUnchanged =
+    targetStatus === currentStatus &&
+    (!requiresTechnician || isSameTechnicianAssignment);
+  const canSave =
+    !saving && !isUnchanged && (!requiresTechnician || Boolean(employeeId));
+
+  async function handleSave() {
+    if (isUnchanged) {
+      onClose();
+      return;
+    }
+
+    if (requiresTechnician && !employeeId) {
+      alert("Please select a technician");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave(
+        targetStatus,
+        requiresTechnician ? employeeId : undefined
+      );
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15, 23, 42, 0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+        zIndex: 1000,
+      }}
+    >
+      <div
+        style={{
+          background: darkMode ? "#1f2937" : "white",
+          color: darkMode ? "#f9fafb" : "#111827",
+          width: "100%",
+          maxWidth: "420px",
+          borderRadius: "16px",
+          padding: "24px",
+          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.2)",
+        }}
+      >
+        <h2 style={{ margin: "0 0 8px", fontSize: "20px" }}>
+          Change Workflow Status
+        </h2>
+        <p
+          style={{
+            margin: "0 0 20px",
+            color: darkMode ? "#cbd5e1" : "#6b7280",
+            fontSize: "14px",
+          }}
+        >
+          Task #{task.id}: {task.issue}
+        </p>
+
+        <label
+          htmlFor={`workflow-status-${task.id}`}
+          style={{
+            display: "block",
+            marginBottom: "8px",
+            fontSize: "14px",
+            fontWeight: 600,
+          }}
+        >
+          Workflow stage
+        </label>
+        <select
+          id={`workflow-status-${task.id}`}
+          value={targetStatus}
+          onChange={(event) =>
+            setTargetStatus(event.target.value as WorkflowSelectorStatus)
+          }
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "12px",
+            borderRadius: "10px",
+            border: `1px solid ${darkMode ? "#475569" : "#d1d5db"}`,
+            background: darkMode ? "#334155" : "white",
+            color: darkMode ? "#f9fafb" : "#111827",
+            fontSize: "15px",
+            marginBottom: requiresTechnician ? "16px" : "24px",
+          }}
+        >
+          {WORKFLOW_SELECTOR_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {WORKFLOW_LABELS[status]}
+            </option>
+          ))}
+        </select>
+
+        {requiresTechnician && (
+          <>
+            <label
+              htmlFor={`workflow-technician-${task.id}`}
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontSize: "14px",
+                fontWeight: 600,
+              }}
+            >
+              Technician
+            </label>
+            <select
+              id={`workflow-technician-${task.id}`}
+              value={employeeId}
+              onChange={(event) => setEmployeeId(event.target.value)}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "12px",
+                borderRadius: "10px",
+                border: `1px solid ${darkMode ? "#475569" : "#d1d5db"}`,
+                background: darkMode ? "#334155" : "white",
+                color: darkMode ? "#f9fafb" : "#111827",
+                fontSize: "15px",
+                marginBottom: "24px",
+              }}
+            >
+              <option value="">Select technician</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.full_name}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={{
+              ...buttonStyle,
+              flex: 1,
+              background: darkMode ? "#374151" : "#e5e7eb",
+              color: darkMode ? "#f9fafb" : "#111827",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{
+              ...buttonStyle,
+              flex: 1,
+              opacity: canSave ? 1 : 0.5,
+              cursor: canSave ? "pointer" : "not-allowed",
+            }}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TaskActionsDropdown({
   task,
   darkMode,
@@ -523,28 +804,14 @@ function TaskActionsDropdown({
   showDelete,
   showPhotos,
   showAiAnalysis,
+  showChangeWorkflowStatus,
   onComments,
   onPhotos,
   onAiAnalysis,
   onEdit,
   onDelete,
   onUploadPhoto,
-  showAcceptRequest,
-  onAcceptRequest,
-  showStartSiteInspection,
-  onStartSiteInspection,
-  showSendQuotation,
-  onSendQuotation,
-  showApprove,
-  onApprove,
-  showAssignTechnician,
-  onAssignTechnician,
-  showStartWork,
-  onStartWork,
-  showFinishWork,
-  onFinishWork,
-  showCloseRequest,
-  onCloseRequest,
+  onChangeWorkflowStatus,
 }: {
   task: Task;
   darkMode: boolean;
@@ -555,28 +822,14 @@ function TaskActionsDropdown({
   showDelete: boolean;
   showPhotos: boolean;
   showAiAnalysis: boolean;
+  showChangeWorkflowStatus: boolean;
   onComments: () => void;
   onPhotos: () => void;
   onAiAnalysis: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onUploadPhoto: (file: File) => Promise<void>;
-  showAcceptRequest: boolean;
-  onAcceptRequest: () => void;
-  showStartSiteInspection: boolean;
-  onStartSiteInspection: () => void;
-  showSendQuotation: boolean;
-  onSendQuotation: () => void;
-  showApprove: boolean;
-  onApprove: () => void;
-  showAssignTechnician: boolean;
-  onAssignTechnician: () => void;
-  showStartWork: boolean;
-  onStartWork: () => void;
-  showFinishWork: boolean;
-  onFinishWork: () => void;
-  showCloseRequest: boolean;
-  onCloseRequest: () => void;
+  onChangeWorkflowStatus: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -688,16 +941,8 @@ Created By: ${task.created_by || "Retail Systems"}`
           {renderMenuItem("Comments", onComments)}
           {showPhotos && renderMenuItem("Photos", onPhotos)}
           {showAiAnalysis && renderMenuItem("AI Analysis", onAiAnalysis)}
-          {showAcceptRequest && renderMenuItem("Accept Request", onAcceptRequest)}
-          {showStartSiteInspection &&
-            renderMenuItem("Start Site Inspection", onStartSiteInspection)}
-          {showSendQuotation && renderMenuItem("Send Quotation", onSendQuotation)}
-          {showApprove && renderMenuItem("Approve", onApprove)}
-          {showAssignTechnician &&
-            renderMenuItem("Assign Technician", onAssignTechnician)}
-          {showStartWork && renderMenuItem("Start Work", onStartWork)}
-          {showFinishWork && renderMenuItem("Finish Work", onFinishWork)}
-          {showCloseRequest && renderMenuItem("Close Request", onCloseRequest)}
+          {showChangeWorkflowStatus &&
+            renderMenuItem("Change Workflow Status", onChangeWorkflowStatus)}
           {showEdit && renderMenuItem("Edit", onEdit)}
           {renderMenuItem("WhatsApp", () => {}, {
             isLink: true,
@@ -762,6 +1007,7 @@ const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 const [editingTask, setEditingTask] = useState<Task | null>(null);
 const [attachmentsModalTask, setAttachmentsModalTask] = useState<Task | null>(null);
 const [aiAnalysisModalTask, setAiAnalysisModalTask] = useState<Task | null>(null);
+const [workflowModalTask, setWorkflowModalTask] = useState<Task | null>(null);
 const [openActionsTaskId, setOpenActionsTaskId] = useState<number | null>(null);
 const [erpMessageToast, setErpMessageToast] = useState<{
   taskId: number;
@@ -1532,30 +1778,191 @@ const paginatedTasks = filteredTasks.slice(
     }
   }
 
-  async function acceptRequest(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const acceptedAt = new Date().toISOString();
+  async function updateWorkflowStatus(
+    taskId: number,
+    targetStatus: WorkflowSelectorStatus,
+    employeeId?: string
+  ) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+
+    const oldWorkflowStatus = task.workflow_status || "new_request";
+    const currentNormalized = normalizeWorkflowStatus(task.workflow_status);
+    const currentEmployeeId = task.employee_id || "";
+
+    if (targetStatus === "technician_assigned") {
+      if (!employeeId) {
+        alert("Please select a technician");
+        return;
+      }
+
+      const selectedEmployee = employees.find(
+        (employee) => employee.id === employeeId
+      );
+      if (!selectedEmployee) {
+        alert("Selected technician not found");
+        return;
+      }
+
+      if (
+        currentNormalized === "technician_assigned" &&
+        currentEmployeeId === employeeId
+      ) {
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const newTaskStatus = getTaskStatusForWorkflow(targetStatus, task.status);
+      const previousTaskValues = {
+        workflow_status: task.workflow_status ?? null,
+        status: task.status,
+        technician_assigned_at: task.technician_assigned_at ?? null,
+        employee_id: task.employee_id ?? null,
+        technician: task.technician ?? "",
+      };
+      const previousAssignments = (task.task_assignments ?? []).map(
+        (assignment) => ({
+          task_id: taskId,
+          employee_id: assignment.employee_id,
+        })
+      );
+
+      const updatePayload = {
+        workflow_status: targetStatus,
+        status: newTaskStatus,
+        technician_assigned_at: now,
+        employee_id: employeeId,
+        technician: selectedEmployee.full_name,
+      };
+
+      const { error: taskUpdateError } = await supabase
+        .from("tasks")
+        .update(updatePayload)
+        .eq("id", taskId);
+
+      if (taskUpdateError) {
+        console.error(taskUpdateError);
+        alert("Error while updating workflow status");
+        if (currentEmployee) {
+          loadTasks(currentEmployee);
+        } else {
+          loadTasks();
+        }
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from("task_assignments")
+        .delete()
+        .eq("task_id", taskId);
+
+      if (deleteError) {
+        console.error(deleteError);
+        await supabase.from("tasks").update(previousTaskValues).eq("id", taskId);
+        alert("Error while updating technician assignment");
+        if (currentEmployee) {
+          loadTasks(currentEmployee);
+        } else {
+          loadTasks();
+        }
+        return;
+      }
+
+      const { error: insertError } = await supabase
+        .from("task_assignments")
+        .insert([{ task_id: taskId, employee_id: employeeId }]);
+
+      if (insertError) {
+        console.error(insertError);
+        await supabase.from("tasks").update(previousTaskValues).eq("id", taskId);
+        if (previousAssignments.length > 0) {
+          await supabase.from("task_assignments").insert(previousAssignments);
+        }
+        alert("Error while updating technician assignment");
+        if (currentEmployee) {
+          loadTasks(currentEmployee);
+        } else {
+          loadTasks();
+        }
+        return;
+      }
+
+      setTasks((prevTasks) =>
+        prevTasks.map((item) =>
+          item.id === taskId
+            ? applyWorkflowTimestamp(
+                {
+                  ...item,
+                  workflow_status: targetStatus,
+                  status: newTaskStatus,
+                  employee_id: employeeId,
+                  technician: selectedEmployee.full_name,
+                },
+                "technician_assigned_at",
+                now
+              )
+            : item
+        )
+      );
+
+      await insertWorkflowHistory(
+        taskId,
+        oldWorkflowStatus,
+        targetStatus,
+        WORKFLOW_HISTORY_ACTIONS[targetStatus]
+      );
+
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
+      return;
+    }
+
+    if (currentNormalized === targetStatus) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const newTaskStatus = getTaskStatusForWorkflow(targetStatus, task.status);
+    const timestampField = WORKFLOW_TIMESTAMP_FIELDS[targetStatus];
+
+    const updatePayload: Record<string, string> = {
+      workflow_status: targetStatus,
+      status: newTaskStatus,
+    };
+
+    if (timestampField) {
+      updatePayload[timestampField] = now;
+    }
 
     setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? { ...task, workflow_status: "accepted", accepted_at: acceptedAt }
-          : task
-      )
+      prevTasks.map((item) => {
+        if (item.id !== taskId) return item;
+
+        let updatedTask: Task = {
+          ...item,
+          workflow_status: targetStatus,
+          status: newTaskStatus,
+        };
+
+        if (timestampField) {
+          updatedTask = applyWorkflowTimestamp(updatedTask, timestampField, now);
+        }
+
+        return updatedTask;
+      })
     );
 
     const { error } = await supabase
       .from("tasks")
-      .update({
-        workflow_status: "accepted",
-        accepted_at: acceptedAt,
-      })
+      .update(updatePayload)
       .eq("id", taskId);
 
     if (error) {
       console.error(error);
-      alert("Error while accepting request");
+      alert("Error while updating workflow status");
       if (currentEmployee) {
         loadTasks(currentEmployee);
       } else {
@@ -1567,8 +1974,8 @@ const paginatedTasks = filteredTasks.slice(
     await insertWorkflowHistory(
       taskId,
       oldWorkflowStatus,
-      "accepted",
-      "Request Accepted"
+      targetStatus,
+      WORKFLOW_HISTORY_ACTIONS[targetStatus]
     );
 
     if (currentEmployee) {
@@ -1578,360 +1985,6 @@ const paginatedTasks = filteredTasks.slice(
     }
   }
 
-  async function startSiteInspection(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const inspectionAt = new Date().toISOString();
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              workflow_status: "site_inspection",
-              inspection_at: inspectionAt,
-            }
-          : task
-      )
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        workflow_status: "site_inspection",
-        inspection_at: inspectionAt,
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error(error);
-      alert("Error while starting site inspection");
-      if (currentEmployee) {
-        loadTasks(currentEmployee);
-      } else {
-        loadTasks();
-      }
-      return;
-    }
-
-    await insertWorkflowHistory(
-      taskId,
-      oldWorkflowStatus,
-      "site_inspection",
-      "Site Inspection Started"
-    );
-
-    if (currentEmployee) {
-      loadTasks(currentEmployee);
-    } else {
-      loadTasks();
-    }
-  }
-
-  async function sendQuotation(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const quotationSentAt = new Date().toISOString();
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              workflow_status: "quotation_sent",
-              quotation_sent_at: quotationSentAt,
-            }
-          : task
-      )
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        workflow_status: "quotation_sent",
-        quotation_sent_at: quotationSentAt,
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error(error);
-      alert("Error while sending quotation");
-      if (currentEmployee) {
-        loadTasks(currentEmployee);
-      } else {
-        loadTasks();
-      }
-      return;
-    }
-
-    await insertWorkflowHistory(
-      taskId,
-      oldWorkflowStatus,
-      "quotation_sent",
-      "Quotation Sent"
-    );
-
-    if (currentEmployee) {
-      loadTasks(currentEmployee);
-    } else {
-      loadTasks();
-    }
-  }
-
-  async function approveRequest(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const approvedAt = new Date().toISOString();
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              workflow_status: "approved",
-              approved_at: approvedAt,
-            }
-          : task
-      )
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        workflow_status: "approved",
-        approved_at: approvedAt,
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error(error);
-      alert("Error while approving request");
-      if (currentEmployee) {
-        loadTasks(currentEmployee);
-      } else {
-        loadTasks();
-      }
-      return;
-    }
-
-    await insertWorkflowHistory(
-      taskId,
-      oldWorkflowStatus,
-      "approved",
-      "Request Approved"
-    );
-
-    if (currentEmployee) {
-      loadTasks(currentEmployee);
-    } else {
-      loadTasks();
-    }
-  }
-
-  async function assignTechnician(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const technicianAssignedAt = new Date().toISOString();
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              workflow_status: "technician_assigned",
-              technician_assigned_at: technicianAssignedAt,
-            }
-          : task
-      )
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        workflow_status: "technician_assigned",
-        technician_assigned_at: technicianAssignedAt,
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error(error);
-      alert("Error while assigning technician");
-      if (currentEmployee) {
-        loadTasks(currentEmployee);
-      } else {
-        loadTasks();
-      }
-      return;
-    }
-
-    await insertWorkflowHistory(
-      taskId,
-      oldWorkflowStatus,
-      "technician_assigned",
-      "Technician Assigned"
-    );
-
-    if (currentEmployee) {
-      loadTasks(currentEmployee);
-    } else {
-      loadTasks();
-    }
-  }
-
-  async function startWork(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const startedAt = new Date().toISOString();
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              workflow_status: "in_progress",
-              started_at: startedAt,
-              status: "In Progress",
-            }
-          : task
-      )
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        workflow_status: "in_progress",
-        started_at: startedAt,
-        status: "In Progress",
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error(error);
-      alert("Error while starting work");
-      if (currentEmployee) {
-        loadTasks(currentEmployee);
-      } else {
-        loadTasks();
-      }
-      return;
-    }
-
-    await insertWorkflowHistory(
-      taskId,
-      oldWorkflowStatus,
-      "in_progress",
-      "Work Started"
-    );
-
-    if (currentEmployee) {
-      loadTasks(currentEmployee);
-    } else {
-      loadTasks();
-    }
-  }
-
-  async function finishWork(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const finishedAt = new Date().toISOString();
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              workflow_status: "finished",
-              finished_at: finishedAt,
-              status: "Completed",
-            }
-          : task
-      )
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        workflow_status: "finished",
-        finished_at: finishedAt,
-        status: "Completed",
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error(error);
-      alert("Error while finishing work");
-      if (currentEmployee) {
-        loadTasks(currentEmployee);
-      } else {
-        loadTasks();
-      }
-      return;
-    }
-
-    await insertWorkflowHistory(
-      taskId,
-      oldWorkflowStatus,
-      "finished",
-      "Work Completed"
-    );
-
-    if (currentEmployee) {
-      loadTasks(currentEmployee);
-    } else {
-      loadTasks();
-    }
-  }
-
-  async function closeRequest(taskId: number) {
-    const oldWorkflowStatus =
-      tasks.find((task) => task.id === taskId)?.workflow_status || "";
-    const closedAt = new Date().toISOString();
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              workflow_status: "closed",
-              closed_at: closedAt,
-            }
-          : task
-      )
-    );
-
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        workflow_status: "closed",
-        closed_at: closedAt,
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      console.error(error);
-      alert("Error while closing request");
-      if (currentEmployee) {
-        loadTasks(currentEmployee);
-      } else {
-        loadTasks();
-      }
-      return;
-    }
-
-    await insertWorkflowHistory(
-      taskId,
-      oldWorkflowStatus,
-      "closed",
-      "Request Closed"
-    );
-
-    if (currentEmployee) {
-      loadTasks(currentEmployee);
-    } else {
-      loadTasks();
-    }
-  }
-  
   
   async function deleteTask(taskId: number) {
     const confirmed = confirm("Delete this task?");
@@ -3977,24 +4030,8 @@ photos={photos}
         showDelete={currentEmployee?.role?.toLowerCase() === "admin"}
         showPhotos={getTaskAttachmentUrls(task.attachments).length > 0}
         showAiAnalysis={Boolean(task.ai_summary?.trim())}
-        showAcceptRequest={
-          !task.workflow_status || task.workflow_status === "new_request"
-        }
-        onAcceptRequest={() => acceptRequest(task.id)}
-        showStartSiteInspection={task.workflow_status === "accepted"}
-        onStartSiteInspection={() => startSiteInspection(task.id)}
-        showSendQuotation={task.workflow_status === "site_inspection"}
-        onSendQuotation={() => sendQuotation(task.id)}
-        showApprove={task.workflow_status === "quotation_sent"}
-        onApprove={() => approveRequest(task.id)}
-        showAssignTechnician={task.workflow_status === "approved"}
-        onAssignTechnician={() => assignTechnician(task.id)}
-        showStartWork={task.workflow_status === "technician_assigned"}
-        onStartWork={() => startWork(task.id)}
-        showFinishWork={task.workflow_status === "in_progress"}
-        onFinishWork={() => finishWork(task.id)}
-        showCloseRequest={task.workflow_status === "finished"}
-        onCloseRequest={() => closeRequest(task.id)}
+        showChangeWorkflowStatus={isAdmin || isGeneral || isManager}
+        onChangeWorkflowStatus={() => setWorkflowModalTask(task)}
         onComments={() => {
           setSelectedTask(task);
           setSelectedTaskId(task.id.toString());
@@ -4213,6 +4250,19 @@ color: darkMode ? "#f9fafb" : "#111827",
     task={aiAnalysisModalTask}
     darkMode={darkMode}
     onClose={() => setAiAnalysisModalTask(null)}
+  />
+)}
+
+{workflowModalTask && (
+  <TaskWorkflowStatusModal
+    key={workflowModalTask.id}
+    task={workflowModalTask}
+    darkMode={darkMode}
+    employees={visibleEmployees}
+    onClose={() => setWorkflowModalTask(null)}
+    onSave={(targetStatus, employeeId) =>
+      updateWorkflowStatus(workflowModalTask.id, targetStatus, employeeId)
+    }
   />
 )}
 
