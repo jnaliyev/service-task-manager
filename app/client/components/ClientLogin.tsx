@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { az } from "@/app/client/i18n/az";
 import ClientBrandMark from "@/app/components/ClientBrandMark";
 import type { ClientPortalSession } from "@/lib/clientPortals/clientSession";
@@ -22,19 +22,39 @@ export default function ClientLogin({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const inFlightRef = useRef(false);
 
-  async function handleSubmit(event: React.FormEvent) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
-    setBusy(true);
+
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
 
     try {
+      const formData = new FormData(event.currentTarget);
+      const nextUsername = String(
+        formData.get("username") ?? username
+      ).trim();
+      const nextPassword = String(
+        formData.get("password") ?? password
+      ).trim();
+
+      if (!nextUsername || !nextPassword) {
+        setError(az.loginError);
+        return;
+      }
+
+      setUsername(nextUsername);
+      setPassword(nextPassword);
+      setError("");
+      setBusy(true);
+
       const response = await fetch(`/api/client-portals/${slug}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: username.trim(),
-          password: password.trim(),
+          username: nextUsername,
+          password: nextPassword,
         }),
       });
 
@@ -53,6 +73,7 @@ export default function ClientLogin({
       console.error(loginError);
       setError(az.loginError);
     } finally {
+      inFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -81,13 +102,15 @@ export default function ClientLogin({
           <h1 style={titleStyle}>{az.loginTitle}</h1>
         </div>
 
-        <form onSubmit={(event) => void handleSubmit(event)} style={formStyle}>
+        <form onSubmit={handleSubmit} style={formStyle}>
           <label style={labelStyle}>
             {az.loginUsername}
             <input
+              name="username"
               type="text"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
+              onInput={(event) => setUsername(event.currentTarget.value)}
               autoComplete="username"
               required
               disabled={busy}
@@ -98,9 +121,11 @@ export default function ClientLogin({
           <label style={labelStyle}>
             {az.loginPassword}
             <input
+              name="password"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              onInput={(event) => setPassword(event.currentTarget.value)}
               autoComplete="current-password"
               required
               disabled={busy}
@@ -109,6 +134,21 @@ export default function ClientLogin({
           </label>
 
           {error && <p style={errorStyle}>{error}</p>}
+
+          {/*
+            Default submit control for Enter-key implicit submission.
+            Kept enabled (except while busy) so Enter still works when the
+            visible button is disabled due to React state lagging autofill.
+          */}
+          <button
+            type="submit"
+            disabled={busy}
+            tabIndex={-1}
+            aria-hidden="true"
+            style={srSubmitStyle}
+          >
+            {az.loginSubmit}
+          </button>
 
           <button
             type="submit"
@@ -175,4 +215,16 @@ const errorStyle: React.CSSProperties = {
   margin: 0,
   color: "#b91c1c",
   fontSize: "14px",
+};
+
+const srSubmitStyle: React.CSSProperties = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
 };
