@@ -1026,9 +1026,25 @@ const [messageUnreadByTask, setMessageUnreadByTask] = useState<
 const isGeneral = currentEmployee?.role?.toLowerCase() === "general";
 const isTechnician = currentEmployee?.role?.toLowerCase() === "technician";
 const isManager = currentEmployee?.role?.toLowerCase() === "manager";
+// Dashboard-wide client-message toasts stay limited to these roles.
 const canUseTaskMessages = Boolean(isAdmin || isGeneral || isManager);
 const isInventory = currentEmployee?.role === "Inventory";
 const isViewer = currentEmployee?.role === "Viewer";
+
+const technicianAssignedToSelectedTask = Boolean(
+  isTechnician &&
+    currentEmployee?.id &&
+    selectedTask &&
+    (String(selectedTask.employee_id) === String(currentEmployee.id) ||
+      (selectedTask.task_assignments ?? []).some(
+        (assignment) =>
+          String(assignment.employee_id) === String(currentEmployee.id)
+      ))
+);
+
+const canViewSelectedTaskMessages = Boolean(
+  canUseTaskMessages || technicianAssignedToSelectedTask
+);
 
   const fetchTaskById = useCallback(async (taskId: number) => {
     const { data, error } = await supabase
@@ -2378,6 +2394,11 @@ return (
           href="/dashboard/inventory"
           icon="📦"
           label="Inventory"
+        />
+        <DashboardNavLink
+          href="/dashboard/construction"
+          icon="🏗️"
+          label="Construction"
         />
       </nav>
     </header>
@@ -4152,7 +4173,7 @@ photos={photos}
       />
     )}
 
-    {canUseTaskMessages && selectedTask && selectedTaskId && (
+    {canViewSelectedTaskMessages && selectedTask && selectedTaskId && (
       <TaskMessagesPanel
         taskId={Number(selectedTaskId)}
         senderName={currentEmployee?.full_name || "ERP"}
