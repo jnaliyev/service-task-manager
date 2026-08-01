@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { formatStoreIdentityLabel } from "@/lib/stores/formatStoreIdentityLabel";
 
 type Store = {
   id: number;
@@ -73,17 +74,6 @@ function getInitialForm(): WizardForm {
     slug: "",
     status: "active",
   };
-}
-
-function getStoreLabel(store: Store) {
-  const name = (store.store_name || "").trim();
-  const location = (store.location || "").trim();
-
-  if (name && location) {
-    return `${name} ${location}`;
-  }
-
-  return name || location || `Store #${store.id}`;
 }
 
 type CreateClientWizardProps = {
@@ -479,7 +469,7 @@ export default function CreateClientWizard({
                                   color: "#111827",
                                 }}
                               >
-                                {getStoreLabel(store)}
+                                {formatStoreIdentityLabel(store)}
                               </span>
                             </label>
                           );

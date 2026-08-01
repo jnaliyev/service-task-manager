@@ -23,6 +23,10 @@ import {
 } from "@/lib/notifications/playNotificationSound";
 import { WORKFLOW_LABELS, type WorkflowStatus } from "@/lib/workflow";
 import { getWorkflowFieldsForStatus } from "@/lib/tasks/syncStatusWorkflow";
+import {
+  formatStoreIdentityLabel,
+  formatTaskStoreIdentityLabel,
+} from "@/lib/stores/formatStoreIdentityLabel";
 
 const WORKFLOW_SELECTOR_STATUSES = [
   "new_request",
@@ -277,23 +281,11 @@ function attachStoresToTasks(
 }
 
 function formatTaskStoreLabel(store: TaskStoreRecord): string {
-  const clientName = getStoreClientName(store);
-  const storeName = store.store_name?.trim() || "";
-  const location = store.location?.trim() || "";
-
-  if (clientName) {
-    return `${clientName} / ${storeName} / ${location}`;
-  }
-
-  return `${storeName} / ${location}`;
+  return formatStoreIdentityLabel(store);
 }
 
 function getTaskStoreLabel(task: Task): string {
-  if (task.stores) {
-    return formatTaskStoreLabel(task.stores as TaskStoreRecord);
-  }
-
-  return task.store || "";
+  return formatTaskStoreIdentityLabel(task);
 }
 
 function getTableRowBackground(
@@ -837,7 +829,7 @@ function TaskActionsDropdown({
   const whatsAppUrl = `https://wa.me/?text=${encodeURIComponent(
     `Task: ${task.issue}
 
-Store: ${task.store}
+Store: ${formatTaskStoreIdentityLabel(task)}
 
 Status: ${task.status}
 
@@ -2881,12 +2873,9 @@ color: textColor,
           .map((store) => {
             if (!store.store_name || !store.location) return null;
 
-            const clientName = getStoreClientName(store);
-
             return (
               <option key={store.id} value={store.id}>
-                {clientName ? `${clientName} / ` : ""}
-                {store.store_name} / {store.location}
+                {formatStoreIdentityLabel(store)}
               </option>
             );
           })}
@@ -3964,22 +3953,8 @@ photos={photos}
     color: darkMode ? "#f8fafc" : "#111827",
   }}
 >
-  <div>
-    <div style={{ color: darkMode ? "#f8fafc" : "#111827" }}>
-      {task.store}
-    </div>
-    {(task.location || task.stores?.location) && (
-      <div
-        style={{
-          fontSize: "13px",
-          color: darkMode ? "#94a3b8" : "#6b7280",
-          marginTop: "4px",
-          lineHeight: 1.4,
-        }}
-      >
-        {task.location || task.stores?.location}
-      </div>
-    )}
+  <div style={{ color: darkMode ? "#f8fafc" : "#111827" }}>
+    {formatTaskStoreIdentityLabel(task)}
   </div>
 </td>
 

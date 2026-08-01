@@ -1,4 +1,5 @@
 import { az } from "@/app/client/i18n/az";
+import { formatStoreIdentityLabel } from "@/lib/stores/formatStoreIdentityLabel";
 
 type Store = {
   id: number;
@@ -44,8 +45,7 @@ export default function StoreSelect({
 
         {filteredStores.map((store) => (
           <option key={store.id} value={String(store.id)}>
-            {store.store_name}
-            {store.location ? ` — ${store.location}` : ""}
+            {formatStoreIdentityLabel(store)}
           </option>
         ))}
       </select>

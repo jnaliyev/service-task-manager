@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { WORKFLOW_LABELS, type WorkflowStatus } from "@/lib/workflow";
+import { formatTaskStoreIdentityLabel } from "@/lib/stores/formatStoreIdentityLabel";
 type Props = {
     task: any;
     buttonStyle: React.CSSProperties;
@@ -53,7 +54,7 @@ type Props = {
         }}
       >
         <h3 style={{ marginBottom: "10px" }}>
-          {task.stores?.store_name || task.store}
+          {formatTaskStoreIdentityLabel(task)}
         </h3>
         <div
   style={{
@@ -260,7 +261,7 @@ type Props = {
     const text = `
 🚨 NEW SERVICE TASK
 
-Store: ${task.stores?.store_name || task.store || ""}
+Store: ${formatTaskStoreIdentityLabel(task)}
 
 Issue: ${task.issue || ""}
 Priority: ${task.priority || ""}
@@ -303,7 +304,7 @@ Created by: ${task.created_by || currentEmployee?.full_name || "Retail Systems"}
     const text = `
 ✅ SERVICE TASK COMPLETED
 
-Store: ${task.stores?.store_name || task.store || ""}
+Store: ${formatTaskStoreIdentityLabel(task)}
 
 Issue: ${task.issue || ""}
 Status: ${task.status || ""}

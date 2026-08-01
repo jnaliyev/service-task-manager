@@ -4,11 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import ClientBrandMark from "@/app/components/ClientBrandMark";
 import { buildPortalUrl } from "@/lib/clientPortals/getAppBaseUrl";
+import { formatStoreIdentityLabel } from "@/lib/stores/formatStoreIdentityLabel";
 
 type ClientStoreOption = {
   id: number;
   store_name: string | null;
   location: string | null;
+  company_name?: string | null;
+  clients?: { client_name?: string | null } | null;
 };
 
 type PortalAccessUser = {
@@ -50,14 +53,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-function formatStoreLabel(store: ClientStoreOption) {
-  const name = (store.store_name || "").trim();
-  const location = (store.location || "").trim();
-
-  if (name && location) return `${name} / ${location}`;
-  return name || location || `Store #${store.id}`;
-}
-
 function StoreBadgeList({
   storeIds,
   storesById,
@@ -75,7 +70,7 @@ function StoreBadgeList({
     <div style={storeBadgeListStyle}>
       {storeIds.map((storeId) => (
         <span key={storeId} style={storeBadgeStyle}>
-          🏬 {formatStoreLabel(
+          🏬 {formatStoreIdentityLabel(
             storesById.get(storeId) || {
               id: storeId,
               store_name: null,
@@ -117,7 +112,7 @@ function StoreCheckboxList({
               checked={checked}
               onChange={() => onToggle(store.id)}
             />
-            {formatStoreLabel(store)}
+            {formatStoreIdentityLabel(store)}
           </label>
         );
       })}
@@ -167,7 +162,7 @@ export default function ClientPortalAccessPanel({
         ),
         supabase
           .from("stores")
-          .select("id, store_name, location")
+          .select("id, store_name, location, company_name, clients(client_name)")
           .eq("client_id", clientId)
           .order("store_name", { ascending: true }),
       ]);
