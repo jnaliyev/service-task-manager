@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireClientTask } from "@/lib/clientPortals/requireClientTask";
 import { getClientRequestPermissions } from "@/lib/clientPortals/verifyClientTask";
+import { getWorkflowFieldsForStatus } from "@/lib/tasks/syncStatusWorkflow";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,9 +82,27 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({ error: "Request cannot be cancelled" }, { status: 403 });
       }
 
+      const taskRow = task as {
+        status?: string | null;
+        employee_id?: string | null;
+        workflow_status?: string | null;
+        started_at?: string | null;
+        finished_at?: string | null;
+        closed_at?: string | null;
+      };
+
+      const syncFields = getWorkflowFieldsForStatus("Cancelled", {
+        employee_id: taskRow.employee_id,
+        workflow_status: taskRow.workflow_status,
+        started_at: taskRow.started_at,
+        finished_at: taskRow.finished_at,
+        closed_at: taskRow.closed_at,
+        previousStatus: taskRow.status,
+      });
+
       const { error } = await supabase
         .from("tasks")
-        .update({ status: "Cancelled" })
+        .update(syncFields)
         .eq("id", taskId);
 
       if (error) {

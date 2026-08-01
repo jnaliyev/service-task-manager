@@ -22,6 +22,7 @@ import {
   unlockNotificationSound,
 } from "@/lib/notifications/playNotificationSound";
 import { WORKFLOW_LABELS, type WorkflowStatus } from "@/lib/workflow";
+import { getWorkflowFieldsForStatus } from "@/lib/tasks/syncStatusWorkflow";
 
 const WORKFLOW_SELECTOR_STATUSES = [
   "new_request",
@@ -1629,6 +1630,15 @@ const paginatedTasks = filteredTasks.slice(
     const selectedEmployee = employees.find(
       (e) => e.id === newTask.employee_id
     );
+
+    const statusSyncFields = getWorkflowFieldsForStatus(newTask.status, {
+      employee_id: newTask.employee_id || null,
+      workflow_status: editingTask?.workflow_status,
+      started_at: editingTask?.started_at,
+      finished_at: editingTask?.finished_at,
+      closed_at: editingTask?.closed_at,
+      previousStatus: editingTask?.status,
+    });
   
     const taskPayload = {
       store: newTask.store,
@@ -1636,13 +1646,13 @@ const paginatedTasks = filteredTasks.slice(
       location: newTask.location || "",
       store_id: newTask.store_id ? Number(newTask.store_id) : null,
       issue: newTask.issue,
-      status: newTask.status,
       category: newTask.category,
       department: newTask.category,
       priority: newTask.priority,
       due_date: newTask.due_date || null,
       employee_id: newTask.employee_id || null,
       technician: selectedEmployee?.full_name || "",
+      ...statusSyncFields,
     };
   
     let taskId = editingTask?.id;
@@ -1660,7 +1670,8 @@ const paginatedTasks = filteredTasks.slice(
             {
               ...taskPayload,
               created_by: currentEmployee?.full_name || "Retail Systems",
-              workflow_status: "new_request",
+              // Create must always have a workflow; Waiting Parts leaves it unset in the helper.
+              workflow_status: statusSyncFields.workflow_status ?? "new_request",
             },
           ])
           .select("id")
@@ -1733,21 +1744,34 @@ const paginatedTasks = filteredTasks.slice(
   async function updateStatus(taskId: number, status: string) {
     const currentTask = tasks.find((t) => t.id === taskId);
     const oldStatus = currentTask?.status || "";
+    const syncFields = getWorkflowFieldsForStatus(status, {
+      employee_id: currentTask?.employee_id,
+      workflow_status: currentTask?.workflow_status,
+      started_at: currentTask?.started_at,
+      finished_at: currentTask?.finished_at,
+      closed_at: currentTask?.closed_at,
+      previousStatus: currentTask?.status,
+    });
   
     setTasks((prevTasks) =>
       prevTasks.map((task) =>
-        task.id === taskId ? { ...task, status } : task
+        task.id === taskId ? { ...task, ...syncFields } : task
       )
     );
   
     const { error } = await supabase
       .from("tasks")
-      .update({ status })
+      .update(syncFields)
       .eq("id", taskId);
   
     if (error) {
       console.error(error);
       alert("Error while updating status");
+      if (currentEmployee) {
+        loadTasks(currentEmployee);
+      } else {
+        loadTasks();
+      }
       return;
     }
   
