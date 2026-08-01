@@ -39,9 +39,32 @@ export async function GET(request: Request, context: RouteContext) {
       return result.error;
     }
 
+    let serviceActPhotos: Array<{
+      id: string | number;
+      photo_url: string | null;
+      created_at: string | null;
+      author: string | null;
+    }> = [];
+
+    const { data: photos, error: photosError } = await supabase
+      .from("task_photos")
+      .select("id, photo_url, created_at, author")
+      .eq("task_id", result.task.id)
+      .order("created_at", { ascending: true });
+
+    if (photosError) {
+      console.error(
+        "Client portal request detail task_photos error:",
+        photosError
+      );
+    } else {
+      serviceActPhotos = photos || [];
+    }
+
     return NextResponse.json({
       request: result.task,
       permissions: getClientRequestPermissions(result.task),
+      serviceActPhotos,
     });
   } catch (error) {
     console.error("Client portal request detail API error:", error);

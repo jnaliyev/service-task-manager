@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import PortalNotFound from "../../../components/PortalNotFound";
 import ClientLogin from "../../../components/ClientLogin";
@@ -37,6 +37,48 @@ type ClientRequestDetail = {
   technician?: string | null;
 };
 
+type ServiceActPhoto = {
+  id: string | number;
+  photo_url: string;
+  created_at?: string | null;
+  author?: string | null;
+};
+
+const DETAIL_POLL_MS = 15000;
+
+function normalizeServiceActPhotos(value: unknown): ServiceActPhoto[] {
+  if (!Array.isArray(value)) return [];
+
+  const photos: ServiceActPhoto[] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+
+    const row = item as Record<string, unknown>;
+    const id = row.id;
+    const photoUrl =
+      typeof row.photo_url === "string" ? row.photo_url.trim() : "";
+
+    if (id === null || id === undefined || id === "") continue;
+    if (!photoUrl || !/^https?:\/\//i.test(photoUrl)) continue;
+
+    photos.push({
+      id: id as string | number,
+      photo_url: photoUrl,
+      created_at:
+        typeof row.created_at === "string" || row.created_at === null
+          ? (row.created_at as string | null)
+          : null,
+      author:
+        typeof row.author === "string" || row.author === null
+          ? (row.author as string | null)
+          : null,
+    });
+  }
+
+  return photos;
+}
+
 function RequestDetailLoading() {
   return (
     <main className="portal-page">
@@ -57,6 +99,9 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [request, setRequest] = useState<ClientRequestDetail | null>(null);
+  const [serviceActPhotos, setServiceActPhotos] = useState<ServiceActPhoto[]>(
+    []
+  );
   const [permissions, setPermissions] = useState<ClientRequestPermissions>({
     canEdit: false,
     canDelete: false,
@@ -66,24 +111,46 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
   });
   const { session, ready, setSession, clearSession } =
     useClientPortalSession(slug);
+  const inFlightRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const loadGenRef = useRef(0);
 
   const loadRequest = useCallback(async (options?: { silent?: boolean }) => {
     if (!slug || !requestId || !session) return;
+    if (inFlightRef.current) return;
 
-    if (!options?.silent) {
+    const silent = Boolean(options?.silent);
+    const controller = new AbortController();
+    const gen = loadGenRef.current;
+
+    abortRef.current = controller;
+    inFlightRef.current = true;
+
+    if (!silent) {
       setLoading(true);
       setNotFound(false);
     }
 
+    const isCurrent = () =>
+      !controller.signal.aborted && gen === loadGenRef.current;
+
     try {
       const response = await fetch(
         `/api/client-portals/${slug}/requests/${requestId}`,
-        { headers: getClientAuthHeaders(session) }
+        {
+          headers: getClientAuthHeaders(session),
+          signal: controller.signal,
+        }
       );
 
+      if (!isCurrent()) return;
+
       if (response.status === 404) {
-        setRequest(null);
-        setNotFound(true);
+        if (!silent) {
+          setRequest(null);
+          setServiceActPhotos([]);
+          setNotFound(true);
+        }
         return;
       }
 
@@ -99,15 +166,37 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
       const data = (await response.json()) as {
         request: ClientRequestDetail;
         permissions: ClientRequestPermissions;
+        serviceActPhotos?: unknown;
       };
+
+      if (!isCurrent()) return;
+
       setRequest(data.request);
       setPermissions(data.permissions);
+      setServiceActPhotos(normalizeServiceActPhotos(data.serviceActPhotos));
+      setNotFound(false);
     } catch (error) {
+      if (
+        controller.signal.aborted ||
+        (error instanceof DOMException && error.name === "AbortError") ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        return;
+      }
+
       console.error(error);
-      setRequest(null);
-      setNotFound(true);
+      if (!silent && isCurrent()) {
+        setRequest(null);
+        setServiceActPhotos([]);
+        setNotFound(true);
+      }
     } finally {
-      if (!options?.silent) {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        inFlightRef.current = false;
+      }
+
+      if (!silent && isCurrent()) {
         setLoading(false);
       }
     }
@@ -153,7 +242,22 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
       return;
     }
 
+    loadGenRef.current += 1;
+    abortRef.current?.abort();
+    inFlightRef.current = false;
+
     void loadRequest();
+
+    const interval = window.setInterval(() => {
+      void loadRequest({ silent: true });
+    }, DETAIL_POLL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+      loadGenRef.current += 1;
+      abortRef.current?.abort();
+      inFlightRef.current = false;
+    };
   }, [loadRequest, ready, session]);
 
   if (!slug || !requestId || !ready) {
@@ -180,6 +284,7 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
   }
 
   const photos = getAttachmentUrls(request.attachments);
+  const validServiceActPhotos = normalizeServiceActPhotos(serviceActPhotos);
 
   return (
     <main className="portal-page">
@@ -235,6 +340,28 @@ export default function RequestDetailPage({ params }: RequestDetailPageProps) {
                   alt=""
                   className="portal-request-photo"
                 />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {validServiceActPhotos.length > 0 && (
+          <div style={{ marginTop: "20px" }}>
+            <p style={labelStyle}>{az.serviceActLabel}</p>
+            <div className="portal-request-photo-grid">
+              {validServiceActPhotos.map((photo) => (
+                <a
+                  key={String(photo.id)}
+                  href={photo.photo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <img
+                    src={photo.photo_url}
+                    alt=""
+                    className="portal-request-photo"
+                  />
+                </a>
               ))}
             </div>
           </div>

@@ -58,6 +58,7 @@ export const az = {
   assignedToLabel: "Təyin edilib",
   notAssigned: "Təyin edilməyib",
   problemPhotosLabel: "Problem şəkilləri",
+  serviceActLabel: "Service Act",
   viewDetails: "Detallara bax",
   timelineTitle: "Timeline",
   loadingTimeline: "Timeline yüklənir...",
